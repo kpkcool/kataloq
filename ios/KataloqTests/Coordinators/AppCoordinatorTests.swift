@@ -47,11 +47,22 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(navigationController.viewControllers.last?.title, "Search")
     }
 
+    func testShowProductDetailPushesTheDetailScreen() {
+        let (sut, navigationController) = makeSUT()
+        sut.start()
+
+        sut.showProductDetail(productID: "1")
+
+        XCTAssertTrue(navigationController.viewControllers.last is ProductDetailViewController)
+    }
+
     func testScreensDoNotRetainTheCoordinator() {
         let (sut, _) = makeSUT()
         let home = sut.makeHome()
         let category = sut.makeCategory(Fixtures.electronics)
         let search = sut.makeSearch()
+        let detail = sut.makeProductDetail(productID: "1")
+        trackForMemoryLeaks(detail)
         trackForMemoryLeaks(home)
         trackForMemoryLeaks(category)
         trackForMemoryLeaks(search)

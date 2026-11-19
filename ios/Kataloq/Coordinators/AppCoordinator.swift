@@ -41,6 +41,12 @@ final class AppCoordinator: Coordinator {
         return SearchViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
     }
 
+    func makeProductDetail(productID: String) -> ProductDetailViewController {
+        let viewModel = ProductDetailViewModel(productID: productID, repository: dependencies.productRepository)
+        viewModel.onEnquireRequested = { [weak self] product in self?.showEnquiry(for: product) }
+        return ProductDetailViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
+    }
+
     // MARK: - Navigation
 
     func showCategory(_ category: ProductCategory) {
@@ -51,7 +57,10 @@ final class AppCoordinator: Coordinator {
         navigationController.pushViewController(makeSearch(), animated: true)
     }
 
-    // Added screen by screen in Phase 4: Product detail → Enquiry.
+    func showProductDetail(productID: String) {
+        navigationController.pushViewController(makeProductDetail(productID: productID), animated: true)
+    }
 
-    func showProductDetail(productID: String) {}
+    // Added in Phase 4, step 5 (enquiry form + thank-you).
+    func showEnquiry(for product: Product) {}
 }
