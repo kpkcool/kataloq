@@ -56,6 +56,15 @@ export const silentLogger: Logger = createLogger({ level: 'silent' });
 
 function serializeError(error: Error): Record<string, unknown> {
   const serialized: Record<string, unknown> = { name: error.name, message: error.message, stack: error.stack };
+  // Node network errors carry the useful part in `code` (e.g. ECONNREFUSED), and
+  // AggregateError (e.g. connecting to both IPv4 and IPv6 localhost) has an empty message.
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === 'string') serialized['code'] = code;
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    serialized['errors'] = error.errors.map((inner: unknown) =>
+      inner instanceof Error ? serializeError(inner) : String(inner),
+    );
+  }
   if (error.cause !== undefined) {
     serialized['cause'] = error.cause instanceof Error ? serializeError(error.cause) : String(error.cause);
   }

@@ -80,6 +80,16 @@
 | Category page checks the category exists **before** fetching its products | Unknown IDs return 404 after one (cached) category lookup. | Made-up category IDs never reach the data source or create cache entries, so they can't be used to flush the cache. |
 | Featured products are fetched in parallel by ID | `Promise.all` over the 5 configured IDs; `null` → skip + warn; any upstream error fails the request. | Five independent lookups; an outage must surface as 502/504, not as "4 products". |
 | Search uses `String.includes`, not a RegExp built from input | `(` or `.*` are matched literally. | No regex injection or ReDoS from user input. |
+| One controller + router per area (catalogue, enquiries) instead of one file per resource | Two small files instead of six. | Fewer files to navigate for 6 endpoints; split when an area grows. |
+| Request ID + request logging in one middleware (`requestContext`) | Reuses a client `X-Request-Id` only if it matches a safe pattern; logs method, path (from `originalUrl`, no query string), status, duration. | One concern ("per-request context"); no log injection; search terms never logged. |
+| `POST /enquiries` returns **202 Accepted** | Sent only after the SMTP server accepted the message. | We can confirm acceptance, not inbox delivery (AS-7). Any provider failure becomes `502 EMAIL_DELIVERY_FAILED`; verified live by stopping Mailpit. |
+| Enquiry email is plain text; Reply-To is the bare validated customer address | Subject built from the product title with line breaks removed. | No HTML/markup injection; no header injection via names or titles. |
+| Enquiry rejects non-JSON bodies with 415 | `req.is('application/json')` check before validation. | Clear error instead of a confusing "fields missing" 400. |
+| Rate limit 5 enquiries/min per IP (`express-rate-limit`, in memory) | Standard `RateLimit` headers + `Retry-After`; catalogue endpoints are not limited. | Spam protection for a form that sends email. In-memory and per instance; behind Docker's port mapping all local clients share one IP, so locally it's effectively global. |
+| Email transport built separately from the SMTP adapter | `smtpTransport.ts` wraps nodemailer; `SmtpEmailProvider` depends on a 1-method `MailTransport` interface. | Adapter logic (failure → `EmailDeliveryError`, rejected recipients) is unit-tested without nodemailer. |
+| Logger records `code` and inner errors | `ECONNREFUSED` etc. are visible even when Node throws an `AggregateError` with an empty message. | Found in the live Mailpit-down test: the first version logged an empty message. |
+| Mailpit pinned by image digest in Compose | Exact image every time. | Reproducible reviewer setup. |
+| Backend image: multi-stage `node:26-alpine`, production deps only, runs as `node` (non-root) | Same image runs locally and on ECS/App Runner. | Smaller attack surface; AWS-compatible. |
 | JSON-lines logger instead of a logging library | ~50 lines, injectable, silent in tests. | Avoids a dependency; JSON lines are what CloudWatch expects. |
 
 ## 7. Security basics

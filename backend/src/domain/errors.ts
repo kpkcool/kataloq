@@ -19,7 +19,10 @@ export type ErrorCode =
   | 'UPSTREAM_UNAVAILABLE'
   | 'UPSTREAM_BAD_RESPONSE'
   | 'UPSTREAM_TIMEOUT'
-  | 'EMAIL_DELIVERY_FAILED';
+  | 'EMAIL_DELIVERY_FAILED'
+  // Produced by the HTTP layer (src/http/errors.ts):
+  | 'UNSUPPORTED_MEDIA_TYPE'
+  | 'RATE_LIMITED';
 
 export abstract class AppError extends Error {
   abstract readonly status: number;
