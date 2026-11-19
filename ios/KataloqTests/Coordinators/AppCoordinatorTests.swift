@@ -37,11 +37,23 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(navigationController.viewControllers.last?.title, "Jewelery")
     }
 
+    func testShowSearchPushesTheSearchScreen() {
+        let (sut, navigationController) = makeSUT()
+        sut.start()
+
+        sut.showSearch()
+
+        XCTAssertTrue(navigationController.viewControllers.last is SearchViewController)
+        XCTAssertEqual(navigationController.viewControllers.last?.title, "Search")
+    }
+
     func testScreensDoNotRetainTheCoordinator() {
         let (sut, _) = makeSUT()
         let home = sut.makeHome()
         let category = sut.makeCategory(Fixtures.electronics)
+        let search = sut.makeSearch()
         trackForMemoryLeaks(home)
         trackForMemoryLeaks(category)
+        trackForMemoryLeaks(search)
     }
 }

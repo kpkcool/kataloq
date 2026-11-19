@@ -35,14 +35,23 @@ final class AppCoordinator: Coordinator {
         return CategoryViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
     }
 
+    func makeSearch() -> SearchViewController {
+        let viewModel = SearchViewModel(repository: dependencies.productRepository)
+        viewModel.onProductSelected = { [weak self] productID in self?.showProductDetail(productID: productID) }
+        return SearchViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
+    }
+
     // MARK: - Navigation
+
     func showCategory(_ category: ProductCategory) {
         navigationController.pushViewController(makeCategory(category), animated: true)
     }
 
-    // Added screen by screen in Phase 4: Search → Product detail → Enquiry.
+    func showSearch() {
+        navigationController.pushViewController(makeSearch(), animated: true)
+    }
 
-    func showSearch() {}
+    // Added screen by screen in Phase 4: Product detail → Enquiry.
 
     func showProductDetail(productID: String) {}
 }
