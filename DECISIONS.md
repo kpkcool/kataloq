@@ -1,0 +1,118 @@
+# Kataloq – Decisions and Assumptions
+
+> **Living document (approved architecture; updated during Phase 3 implementation).** Written before implementation. Every entry will be checked against the actual code in Phase 7, and anything that changed during the build will be updated with the reason.
+
+## 1. Technology choices
+
+| Choice | Reason |
+|---|---|
+| **iOS app in Swift + UIKit** | The assignment lets us pick the client. Native iOS is my strongest platform, so I can defend every line. UIKit (rather than SwiftUI) gives explicit control over lifecycle, navigation and list performance, and fits MVVM-C cleanly. iOS 16 minimum: async/await and modern collection view APIs, without excluding many devices. |
+| **MVVM-C** | ViewModels hold state and logic with no UIKit import, so they can be unit tested. Coordinators keep navigation out of ViewControllers, so screens are reusable and flows can change (e.g. deep links) without touching screens. |
+| **Node.js 26 LTS + TypeScript backend** | TypeScript strict mode catches contract mistakes at compile time; Node is the backend option in the brief with the fastest path to a tested REST API; it runs anywhere on AWS (ECS, App Runner, Lambda with an adapter). |
+| **Express 5, zod, nodemailer, express-rate-limit** | Each removes code we'd otherwise write and test ourselves; all are widely known. Native `fetch` instead of axios; no DI framework; no logger library. |
+| **vitest + supertest / XCTest** | Fast TS-native tests without extra config; real HTTP-level integration tests; XCTest is the platform standard with no dependencies. |
+
+## 2. Architectural decisions
+
+| # | Decision | Why | Trade-off |
+|---|---|---|---|
+| AD-1 | **The iOS app only talks to `kataloq-api`, never Fake Store** | Required by the brief, and the right boundary anyway: the data source is expected to change, and changing it must not need an app release. The backend is the anti-corruption layer. | One extra hop of latency. |
+| AD-2 | **`ProductProvider` and `EmailProvider` interfaces** owned by the domain; Fake Store and SMTP are adapters | The brief says the data source and email provider will change. Services depend on the interfaces; only the composition root picks the adapters. | Two small interfaces. Deliberately **not** abstracting things that aren't expected to change. |
+| AD-3 | **Our own API contract and domain model** (camelCase, string IDs, `price { amount, currency }`, `rating { average, count }`, category `{ id: slug, name }`) | Fake Store's shapes (numeric IDs, `rate`, category names with spaces and apostrophes, a misspelt "jewelery") shouldn't leak into the app. String IDs mean a future source with SKUs/UUIDs doesn't break the contract. | Mapping code in the adapter (tested). |
+| AD-4 | **Business rules live in the backend** (featured selection, category ranking, search) | One source of truth for every future client (web, Android); rules can change without an app release. | Client can't work offline. Not required. |
+| AD-5 | **Pure domain functions** for ranking, search matching and enquiry validation | The most important rules are the easiest to test exhaustively. | — |
+| AD-6 | **Caching decorator** (`CachingProductProvider`, 60 s in-memory TTL) around the product provider. Caches successful results only; failures and not-found results are never cached; concurrent misses for the same key share one in-flight upstream request (single-flight); 500-entry cap. | Fake Store is a free public API with variable latency; the catalogue is tiny. As a decorator implementing the same interface, it keeps caching out of business logic and the adapter, and can be removed (`PRODUCT_CACHE_TTL_SECONDS=0`) or replaced (e.g. Redis) without touching services. Single-flight stops a burst of cold requests from stampeding the upstream. | Data up to 60 s stale (e.g. a deleted featured product may show for up to 60 s); cache is per process and lost on restart. |
+| AD-7 | **Single `AppCoordinator`** | Five screens and one modal flow. Child coordinators would add lifecycle code without benefit at this size. | Will need splitting (e.g. an `EnquiryCoordinator`) as flows grow. |
+| AD-8 | **Closure-based ViewModel → ViewController binding** with a `LoadState` enum | iOS 16 rules out Observation; Combine adds machinery we don't need. A closure plus `[weak self]` is easy to read and test. | Less composable than Combine for complex reactive screens. |
+| AD-9 | **No DTO layer on iOS** | The backend already maps to our contract; a second mapping would duplicate it. | If the API ever diverges from screen needs, mapping goes in repositories. |
+| AD-10 | **Versioned API (`/api/v1`) and a uniform error body** `{ error: { code, message, requestId, details? } }` | Clients branch on stable `code`s, not messages; `requestId` links a user report to server logs; versioning lets the contract evolve. | — |
+| AD-11 | **Config via environment variables, validated at startup** | 12-factor, works the same locally, in Compose and on AWS; misconfiguration fails at boot instead of at the first request. | — |
+| AD-12 | **Monorepo** (`ios/`, `backend/`, `docs/`) | One repo, one PR, one README, as the submission requires; API and client change together. | Larger PR. |
+| AD-13 | **`docker compose up --build` runs the backend and Mailpit** (SMTP + web inbox); iOS runs from Xcode. Every variable has a default in Compose, so no `.env` is needed to start. | One command meets the "running in under 10 minutes" rule; the backend's Dockerfile doubles as the AWS deployment artefact. | Reviewer needs Docker. |
+| AD-15 | **Product images are loaded by the app directly from the `imageUrl` the backend returns** (no image proxy). | The brief's rule is that product *data* must go through our backend; the image URL **is** backend-supplied data, and the bytes are static assets. Serving images from a dedicated host is how production catalogues work. A proxy would add ~1 h of streaming, size-limit and SSRF-safety code off the critical path. | The app makes image GETs to the image host (today `fakestoreapi.com/img/…`). When the data source changes, images move to our own CDN / object storage (e.g. S3 + CloudFront) and only the URLs change. |
+| AD-16 | **Fake Store bot challenges are surfaced, not bypassed.** A Cloudflare `403` challenge (`cf-mitigated: challenge`) is mapped to `502 UPSTREAM_UNAVAILABLE` with a clear log line. Requests send honest headers (`Accept: application/json`, `User-Agent: kataloq-api/<version>`). | Evading a site operator's bot protection isn't acceptable engineering. Node `fetch` to Fake Store was verified to work (HTTP 200) on 2026-11-19, so no fallback data source was built. | The demo depends on Fake Store accepting requests from the reviewer's network. A fixture-backed provider is the first "next day" item. |
+| AD-14 | **No UI test target**; all XCTest tests use mocked networking/repositories. | UI tests against a live backend are slow and flaky for a PoC; the critical path is covered by ViewModel, repository, networking and coordinator tests plus the manual E2E checklist. | No automated end-to-end UI coverage. |
+
+## 3. Assumptions (where the acceptance criteria were unclear)
+
+| # | Assumption | Reason |
+|---|---|---|
+| AS-1 | **Home "top rated" = 5 manually curated product IDs**, configured in `FEATURED_PRODUCT_IDS`, shown in configured order. | The criterion says *"I have chosen 5 products"* — a human choice, not a computed one. Env config needs no admin UI or database; later it can move to a CMS behind the same service method. |
+| AS-2 | **Category "top rated" = computed**: all products in the category are ranked by rating average (desc), then rating count (desc); products tied on both keep their data-source order. The first 3 (configurable, `CATEGORY_TOP_RATED_COUNT`) are shown as **"Top Rated"**; the rest as **"All Products"** in the same order. One sorted list split in two, so no product appears twice. A category with 3 or fewer products shows only "Top Rated". | "Top rated for that category" can't mean the 5 global picks: most categories would have none. Ranking by rating is objective and needs no extra curation. **This means "top rated" means different things on Home (curated) and Category (computed) — a deliberate distinction.** |
+| AS-3 | Category links appear on Home; categories come from the data source, not hardcoded. | The criterion needs an entry point; hardcoding would break when the data source changes. |
+| AS-4 | **Search** = trimmed, case-insensitive substring match of the whole term against title, description and category name; runs on the search button (keyboard Search), not as-you-type; blank terms aren't sent (client) and are rejected (server, 400); max 100 chars; results keep the data source's original order — no relevance scoring. | Simplest rule that satisfies "text matching", predictable and testable. Matching descriptions broadens results — accepted. Relevance ranking is out of scope for ~20 products. |
+| AS-5 | The details screen fetches the product by ID rather than reusing list data. | Works from any entry point (and future deep links); data source can return richer details later. |
+| AS-6 | **Enquiry fields**: name (required), email (required), phone (optional), message (optional); product ID sent automatically. Client validation is for UX; backend validation is authoritative. | "Contact details" needs at least a name and a way to reply; optional fields shouldn't block a lead. |
+| AS-7 | "The sales inbox will receive an email" = the email provider **accepted** the message. Only then does the app show "Thank you". The API returns `202 Accepted`. | Inbox delivery can't be observed synchronously; provider acceptance is the standard success signal. A provider failure is never reported as success. |
+| AS-8 | The sales inbox is `SALES_INBOX_EMAIL`; locally it's captured by **Mailpit** (Docker), viewable at `http://localhost:8025`. | Free, no accounts; exercises the real SMTP path. |
+| AS-9 | **Documented exception to "exactly five":** exactly 5 unique featured IDs are enforced at startup (the backend refuses to start otherwise), so Home normally shows exactly 5. If a configured product later becomes unavailable upstream, it is **skipped and a warning is logged**; the endpoint then returns fewer than 5. **No other product is ever substituted**: the owner chose these 5, and silently picking a replacement would misrepresent that choice. An upstream outage is *not* treated as "unavailable"; it returns 502/504. | Partial content beats an error page, but hiding an outage or overriding the owner's choice would mislead. |
+| AS-10 | Prices are shown as dollars to 2 decimals via one formatter driven by the `currency` field (USD for Fake Store). | Placeholder data; one place to change. |
+| AS-11 | iPhone, portrait-first, iOS 16+. | Brief targets the simulator; iPad optimisation not needed for a PoC. |
+
+## 4. Requirements simplified or dropped
+
+| Item | What we did | Why |
+|---|---|---|
+| Enquiry persistence | Not stored; the email is the only record. | No requirement; avoids a database in the PoC. Risk: if email fails the user is told and must retry. |
+| Search relevance | No ranking or fuzzy matching. | Not in the criteria; catalogue of ~20 items. |
+| Pagination | None. | ~20 products. Lists are wrapped in objects so pagination fields can be added later without breaking clients. |
+| Auth, accounts, cart, wishlists, analytics | Out of scope. | Not in the criteria. |
+| Infrastructure as code | None; a backend `Dockerfile` only. | Brief only requires AWS compatibility *if* infra is included; time-box. |
+| Automatic retries | None; user-initiated retry only. | POST enquiry isn't idempotent — a blind retry could send two emails. |
+| UI test target | Removed (`KataloqUITests`). | Template only; would need a running backend. E2E covered by the manual/scripted checklist (AD-14). |
+| Visual design | Clean system styling via a central `Theme`; no custom design. | Creative work is happening separately; the brief expects the look and feel to change. |
+
+## 5. Notes for the interview
+
+- **Fake Store quirk:** `GET /products/<unknown id>` returns `200` with an empty body, not `404` (verified 2026-11-19). The adapter converts this to "not found" so the quirk never leaks past it.
+- **"Top rated" means two different things, deliberately:** curated on Home (the owner's choice), computed by rating on Category pages.
+- **Product images:** loaded directly from the backend-supplied URL (AD-15). The rule against calling Fake Store from the app covers product data, not static image delivery. Future: our own image CDN / object storage.
+- **Fake Store sometimes returns a Cloudflare challenge** (`403`, `cf-mitigated: challenge`, seen on 2026-11-19). We surface it as 502 and don't try to bypass it (AD-16).
+
+## 6. Implementation notes (Phase 3)
+
+| Decision | Detail | Why |
+|---|---|---|
+| Fake Store adapter filters `/products` for a category instead of calling `/products/category/{name}` | One upstream request instead of two (no slug → raw-name lookup) and no URL-encoding of names like `men's clothing`. | Fake Store has ~20 products. The `ProductProvider` interface still lets a large-catalogue provider query by category. |
+| List responses tolerate individual bad items | An item failing schema validation is skipped and logged; a non-array body is an error. | One malformed record shouldn't take down the whole catalogue. |
+| Only `https` image URLs are passed to clients | Anything else becomes `null` and the app shows a placeholder. | iOS ATS blocks plain http anyway; avoids mixed content. |
+| Configuration is validated at startup with zod | Empty values (`VAR=`) mean "use the default". Invalid values stop the process with a list of problems. | Fail fast instead of failing at the first request; works the same in Compose and on AWS. |
+| Category page checks the category exists **before** fetching its products | Unknown IDs return 404 after one (cached) category lookup. | Made-up category IDs never reach the data source or create cache entries, so they can't be used to flush the cache. |
+| Featured products are fetched in parallel by ID | `Promise.all` over the 5 configured IDs; `null` → skip + warn; any upstream error fails the request. | Five independent lookups; an outage must surface as 502/504, not as "4 products". |
+| Search uses `String.includes`, not a RegExp built from input | `(` or `.*` are matched literally. | No regex injection or ReDoS from user input. |
+| JSON-lines logger instead of a logging library | ~50 lines, injectable, silent in tests. | Avoids a dependency; JSON lines are what CloudWatch expects. |
+
+## 7. Security basics
+
+- Input validation on every endpoint (zod); request body capped at 10 KB.
+- Header-injection protection: line breaks rejected in name/email/phone; customer input never used in SMTP headers except a validated `Reply-To`.
+- Per-IP rate limit on `POST /enquiries` (default 5/min). In-memory: fine for one instance, needs a shared store (Redis / API Gateway throttling) for more.
+- No secrets in the repo; `.env.example` only; SMTP credentials optional and env-only.
+- No PII or request bodies in logs; no stack traces or upstream details in responses.
+- iOS ATS stays on; only local networking is allowed for the simulator.
+
+## 8. How the design supports growth
+
+| Expected change | What changes | What doesn't |
+|---|---|---|
+| New product data source | One new `ProductProvider` adapter + config | Services, API contract, iOS app |
+| New email vendor (e.g. SES) | One new `EmailProvider` adapter + env vars | Enquiry rules, API, app |
+| New look and feel | `Theme` + reusable components | ViewModels, networking, backend |
+| Featured products managed by staff | `getFeatured` reads from a CMS/DB instead of env | Endpoint, app |
+| More clients (web, Android) | Consume the same `/api/v1` | Business rules (already server-side) |
+| More traffic | Shared cache, shared rate-limit store, horizontal scaling (stateless API) | Code structure |
+
+## 9. What I'd do next with another day
+
+*(Draft — to be finalised in Phase 7 against what was actually built.)*
+
+1. Persist enquiries and send email from an outbox with retries (no lost leads when the provider is down); add an idempotency key to `POST /enquiries`.
+2. OpenAPI spec generated from the zod schemas; contract tests shared by iOS fixtures and the backend.
+3. CI (GitHub Actions): backend typecheck + tests, `xcodebuild test` on a simulator.
+4. An opt-in fixture-backed `ProductProvider` (`PRODUCT_PROVIDER=fixture`) for offline demos, deterministic E2E tests, and networks where Fake Store's Cloudflare protection challenges requests. Considered during planning and deferred: Node `fetch` reached Fake Store fine, and it's off the acceptance-criteria path.
+5. Image caching to disk, accessibility audit (Dynamic Type, VoiceOver order), snapshot tests.
+6. Deploy: backend container to AWS App Runner/ECS, SES as `EmailProvider`, secrets in SSM/Secrets Manager.
+
+## 10. Time spent
+
+*(Filled in honestly at the end: planning / building / testing / reviewing.)*
