@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 @testable import Kataloq
 
 enum MockError: Error, Equatable {
@@ -51,5 +51,26 @@ final class MockProductRepository: ProductRepository, @unchecked Sendable {
     func product(id: String) async throws -> Product {
         calls.append("product:\(id)")
         return try productResult.get()
+    }
+}
+
+final class MockEnquiryRepository: EnquiryRepository, @unchecked Sendable {
+    var result: Result<EnquiryConfirmation, Error> = .success(EnquiryConfirmation(enquiryId: "e1", status: "sent"))
+    private(set) var submitted: [EnquiryRequest] = []
+
+    func submit(_ enquiry: EnquiryRequest) async throws -> EnquiryConfirmation {
+        submitted.append(enquiry)
+        return try result.get()
+    }
+}
+
+/// Never loads anything: cells keep their placeholder.
+@MainActor
+final class MockImageLoader: ImageLoading {
+    private(set) var requestedURLs: [URL] = []
+
+    func image(for url: URL) async -> UIImage? {
+        requestedURLs.append(url)
+        return nil
     }
 }

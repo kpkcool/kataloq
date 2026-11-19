@@ -1,6 +1,6 @@
 import UIKit
 
-/// Home: a horizontal row of category chips and a 2-column grid of featured products.
+/// Home: a horizontal row of category chips and a horizontally scrolling row of featured products.
 /// Renders `HomeViewModel.state` and forwards taps; no networking or navigation here.
 final class HomeViewController: UIViewController {
     private enum Section: Hashable {
@@ -33,6 +33,7 @@ final class HomeViewController: UIViewController {
         self.viewModel = viewModel
         self.imageLoader = imageLoader
         super.init(nibName: nil, bundle: nil)
+        title = viewModel.title
     }
 
     required init?(coder: NSCoder) {
@@ -45,7 +46,6 @@ final class HomeViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = viewModel.title
         view.backgroundColor = Theme.Color.background
         configureNavigationItem()
         configureCollectionView()
@@ -177,26 +177,10 @@ final class HomeViewController: UIViewController {
         UICollectionViewCompositionalLayout { [weak self] sectionIndex, _ in
             guard let section = self?.dataSource.sectionIdentifier(for: sectionIndex) else { return nil }
             switch section {
-            case .categories: return HomeViewController.categoriesSection()
-            case .featured: return LayoutSections.productGrid()
+            case .categories: return LayoutSections.chipRow()
+            case .featured: return LayoutSections.productCarousel()
             }
         }
-    }
-
-    private static func categoriesSection() -> NSCollectionLayoutSection {
-        let size = NSCollectionLayoutSize(widthDimension: .estimated(120), heightDimension: .estimated(36))
-        let item = NSCollectionLayoutItem(layoutSize: size)
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: size, subitems: [item])
-
-        let section = NSCollectionLayoutSection(group: group)
-        section.orthogonalScrollingBehavior = .continuous
-        section.interGroupSpacing = Theme.Spacing.small
-        section.contentInsets = NSDirectionalEdgeInsets(
-            top: Theme.Spacing.small, leading: Theme.Spacing.large,
-            bottom: Theme.Spacing.xLarge, trailing: Theme.Spacing.large
-        )
-        section.boundarySupplementaryItems = [LayoutSections.header()]
-        return section
     }
 }
 

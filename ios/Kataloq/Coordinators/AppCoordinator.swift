@@ -29,10 +29,18 @@ final class AppCoordinator: Coordinator {
         return HomeViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
     }
 
-    // MARK: - Navigation
-    // Destinations are added screen by screen in Phase 4 (Category → Search → Product detail → Enquiry).
+    func makeCategory(_ category: ProductCategory) -> CategoryViewController {
+        let viewModel = CategoryViewModel(category: category, repository: dependencies.productRepository)
+        viewModel.onProductSelected = { [weak self] productID in self?.showProductDetail(productID: productID) }
+        return CategoryViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
+    }
 
-    func showCategory(_ category: ProductCategory) {}
+    // MARK: - Navigation
+    func showCategory(_ category: ProductCategory) {
+        navigationController.pushViewController(makeCategory(category), animated: true)
+    }
+
+    // Added screen by screen in Phase 4: Search → Product detail → Enquiry.
 
     func showSearch() {}
 

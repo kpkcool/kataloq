@@ -5,9 +5,12 @@ final class ProductCardCell: UICollectionViewCell {
     private let imageContainer = UIView()
     private let imageView = UIImageView()
     private let titleLabel = UILabel()
+    private let titleContainer = UIView()
     private let priceLabel = UILabel()
     private let ratingLabel = UILabel()
 
+    /// Reserves two lines for the title so every card in a row has the same height.
+    private lazy var titleMinHeight = titleContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 0)
     private var imageTask: Task<Void, Never>?
     private var representedImageURL: URL?
 
@@ -42,6 +45,7 @@ final class ProductCardCell: UICollectionViewCell {
 
     func configure(with item: ProductCardViewData, imageLoader: any ImageLoading) {
         titleLabel.text = item.title
+        titleMinHeight.constant = ceil(titleLabel.font.lineHeight * 2)
         priceLabel.text = item.priceText
         ratingLabel.text = item.ratingText
         accessibilityLabel = item.accessibilityLabel
@@ -90,6 +94,7 @@ final class ProductCardCell: UICollectionViewCell {
         titleLabel.font = Theme.Font.cardTitle
         titleLabel.textColor = Theme.Color.primaryText
         titleLabel.numberOfLines = 2
+        titleLabel.lineBreakMode = .byTruncatingTail
 
         priceLabel.font = Theme.Font.price
         priceLabel.textColor = Theme.Color.primaryText
@@ -99,7 +104,17 @@ final class ProductCardCell: UICollectionViewCell {
 
         [titleLabel, priceLabel, ratingLabel].forEach { $0.adjustsFontForContentSizeCategory = true }
 
-        let textStack = UIStackView(arrangedSubviews: [titleLabel, priceLabel, ratingLabel])
+        // The title sits at the top of a container that's always at least two lines tall.
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleContainer.addSubview(titleLabel)
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: titleContainer.topAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
+            titleLabel.trailingAnchor.constraint(equalTo: titleContainer.trailingAnchor),
+            titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: titleContainer.bottomAnchor),
+        ])
+
+        let textStack = UIStackView(arrangedSubviews: [titleContainer, priceLabel, ratingLabel])
         textStack.axis = .vertical
         textStack.spacing = Theme.Spacing.xSmall
         textStack.translatesAutoresizingMaskIntoConstraints = false
@@ -123,6 +138,7 @@ final class ProductCardCell: UICollectionViewCell {
             textStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
             textStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
             textStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -inset),
+            titleMinHeight,
         ])
     }
 }

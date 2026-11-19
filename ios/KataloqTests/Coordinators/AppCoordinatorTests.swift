@@ -1,0 +1,47 @@
+import UIKit
+import XCTest
+@testable import Kataloq
+
+@MainActor
+final class AppCoordinatorTests: XCTestCase {
+    private func makeSUT() -> (AppCoordinator, UINavigationController) {
+        let navigationController = UINavigationController()
+        let dependencies = AppDependencies(
+            productRepository: MockProductRepository(),
+            enquiryRepository: MockEnquiryRepository(),
+            imageLoader: MockImageLoader()
+        )
+        let sut = AppCoordinator(navigationController: navigationController, dependencies: dependencies)
+        trackForMemoryLeaks(sut)
+        return (sut, navigationController)
+    }
+
+    func testStartShowsHomeAsTheRootScreen() {
+        let (sut, navigationController) = makeSUT()
+
+        sut.start()
+
+        XCTAssertEqual(navigationController.viewControllers.count, 1)
+        XCTAssertTrue(navigationController.viewControllers.first is HomeViewController)
+        XCTAssertEqual(navigationController.viewControllers.first?.title, "Kataloq")
+    }
+
+    func testShowCategoryPushesTheCategoryScreen() {
+        let (sut, navigationController) = makeSUT()
+        sut.start()
+
+        sut.showCategory(Fixtures.jewelery)
+
+        XCTAssertEqual(navigationController.viewControllers.count, 2)
+        XCTAssertTrue(navigationController.viewControllers.last is CategoryViewController)
+        XCTAssertEqual(navigationController.viewControllers.last?.title, "Jewelery")
+    }
+
+    func testScreensDoNotRetainTheCoordinator() {
+        let (sut, _) = makeSUT()
+        let home = sut.makeHome()
+        let category = sut.makeCategory(Fixtures.electronics)
+        trackForMemoryLeaks(home)
+        trackForMemoryLeaks(category)
+    }
+}

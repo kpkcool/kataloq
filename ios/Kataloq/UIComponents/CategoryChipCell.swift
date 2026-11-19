@@ -1,7 +1,8 @@
 import UIKit
 
-/// A tappable category "pill" for the horizontal category row.
+/// A tappable category "pill" with an icon, for the horizontal category row.
 final class CategoryChipCell: UICollectionViewCell {
+    private let iconView = UIImageView()
     private let titleLabel = UILabel()
 
     override init(frame: CGRect) {
@@ -19,6 +20,7 @@ final class CategoryChipCell: UICollectionViewCell {
 
     func configure(with category: ProductCategory) {
         titleLabel.text = category.name
+        iconView.image = UIImage(systemName: CategoryIcon.symbolName(for: category))
         accessibilityLabel = category.name
     }
 
@@ -31,17 +33,41 @@ final class CategoryChipCell: UICollectionViewCell {
         accessibilityTraits = .button
         accessibilityHint = "Shows products in this category."
 
+        iconView.tintColor = Theme.Color.accent
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .subheadline)
+        iconView.contentMode = .scaleAspectFit
+        iconView.setContentHuggingPriority(.required, for: .horizontal)
+
         titleLabel.font = Theme.Font.chip
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.Color.primaryText
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(titleLabel)
+
+        let stack = UIStackView(arrangedSubviews: [iconView, titleLabel])
+        stack.axis = .horizontal
+        stack.spacing = Theme.Spacing.small
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Theme.Spacing.small),
-            titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.small),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Theme.Spacing.large),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.large),
+            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Theme.Spacing.small + 2),
+            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -(Theme.Spacing.small + 2)),
+            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Theme.Spacing.large),
+            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.large),
         ])
+    }
+}
+
+/// Presentation-only mapping from category to an SF Symbol. Unknown categories (e.g. from a
+/// future data source) get a generic tag icon, so nothing breaks when categories change.
+enum CategoryIcon {
+    static func symbolName(for category: ProductCategory) -> String {
+        switch category.id {
+        case "electronics": return "desktopcomputer"
+        case "jewelery", "jewellery", "jewelry": return "sparkles"
+        case "mens-clothing": return "tshirt"
+        case "womens-clothing": return "handbag"
+        default: return "tag"
+        }
     }
 }
