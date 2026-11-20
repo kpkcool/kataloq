@@ -123,8 +123,12 @@ final class CategoryViewController: UIViewController {
     private func makeDataSource() -> UICollectionViewDiffableDataSource<Section, ProductCardViewData> {
         let imageLoader = self.imageLoader
 
-        let productRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
-            cell.configure(with: item, imageLoader: imageLoader)
+        // One cell class, two styles: "Top Rated" is a featured carousel, "All Products" a standard grid.
+        let featuredRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
+            cell.configure(with: item, style: .featured, imageLoader: imageLoader)
+        }
+        let standardRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
+            cell.configure(with: item, style: .standard, imageLoader: imageLoader)
         }
         let headerRegistration = UICollectionView.SupplementaryRegistration<SectionHeaderView>(
             elementKind: UICollectionView.elementKindSectionHeader
@@ -135,8 +139,11 @@ final class CategoryViewController: UIViewController {
 
         let dataSource = UICollectionViewDiffableDataSource<Section, ProductCardViewData>(
             collectionView: collectionView
-        ) { collectionView, indexPath, item in
-            collectionView.dequeueConfiguredReusableCell(using: productRegistration, for: indexPath, item: item)
+        ) { [weak self] collectionView, indexPath, item in
+            let isTopRated = self?.dataSource.sectionIdentifier(for: indexPath.section) == .topRated
+            return collectionView.dequeueConfiguredReusableCell(
+                using: isTopRated ? featuredRegistration : standardRegistration, for: indexPath, item: item
+            )
         }
         dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
             collectionView.dequeueConfiguredReusableSupplementary(using: headerRegistration, for: indexPath)
@@ -145,11 +152,11 @@ final class CategoryViewController: UIViewController {
     }
 
     private func makeLayout() -> UICollectionViewLayout {
-        UICollectionViewCompositionalLayout { [weak self] sectionIndex, _ in
+        UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
             guard let section = self?.dataSource.sectionIdentifier(for: sectionIndex) else { return nil }
             switch section {
-            case .topRated: return LayoutSections.productCarousel()
-            case .allProducts: return LayoutSections.productGrid()
+            case .topRated: return LayoutSections.productCarousel(environment: environment)
+            case .allProducts: return LayoutSections.productGrid(environment: environment)
             }
         }
     }

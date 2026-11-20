@@ -7,12 +7,12 @@ final class ProductDetailViewController: UIViewController {
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let imageContainer = UIView()
-    private let imageView = UIImageView()
+    /// Same image component as the product cards, larger padding and a slightly shorter tile.
+    private let productImageView = ProductImageView(aspectRatio: 0.85)
     private let categoryLabel = UILabel()
     private let titleLabel = UILabel()
     private let priceLabel = UILabel()
-    private let ratingLabel = UILabel()
+    private let ratingView = ProductRatingView()
     private let descriptionHeaderLabel = UILabel()
     private let descriptionLabel = UILabel()
     private let bottomBar = UIView()
@@ -22,7 +22,6 @@ final class ProductDetailViewController: UIViewController {
     private static let hairline: CGFloat = 0.5
 
     private var loadTask: Task<Void, Never>?
-    private var imageTask: Task<Void, Never>?
 
     init(viewModel: ProductDetailViewModel, imageLoader: any ImageLoading) {
         self.viewModel = viewModel
@@ -36,7 +35,6 @@ final class ProductDetailViewController: UIViewController {
 
     deinit {
         loadTask?.cancel()
-        imageTask?.cancel()
     }
 
     override func viewDidLoad() {
@@ -79,27 +77,10 @@ final class ProductDetailViewController: UIViewController {
         categoryLabel.accessibilityLabel = "Category: \(content.categoryName)"
         titleLabel.text = content.title
         priceLabel.text = content.priceText
-        ratingLabel.text = content.ratingText
-        ratingLabel.accessibilityLabel = content.ratingAccessibilityText
+        ratingView.configure(score: content.ratingScoreText, count: content.ratingCountText, isRated: content.isRated)
+        ratingView.accessibilityLabel = content.ratingAccessibilityText
         descriptionLabel.text = content.description
-        loadImage(content.imageURL)
-    }
-
-    private func loadImage(_ url: URL?) {
-        imageTask?.cancel()
-        imageView.contentMode = .center
-        imageView.image = UIImage(systemName: "photo")
-        imageView.accessibilityLabel = "Product image unavailable"
-        guard let url else { return }
-
-        let imageLoader = self.imageLoader
-        imageTask = Task { [weak self] in
-            let image = await imageLoader.image(for: url)
-            guard let self, !Task.isCancelled, let image else { return }
-            self.imageView.contentMode = .scaleAspectFit
-            self.imageView.image = image
-            self.imageView.accessibilityLabel = "Product image"
-        }
+        productImageView.load(content.imageURL, using: imageLoader)
     }
 
     /// Loading and error cover the content; the Enquire button only appears with a loaded product.
@@ -126,10 +107,10 @@ final class ProductDetailViewController: UIViewController {
         contentStack.axis = .vertical
         contentStack.spacing = Theme.Spacing.small
         contentStack.translatesAutoresizingMaskIntoConstraints = false
-        [imageContainer, categoryLabel, titleLabel, priceLabel, ratingLabel, descriptionHeaderLabel, descriptionLabel]
+        [productImageView, categoryLabel, titleLabel, priceLabel, ratingView, descriptionHeaderLabel, descriptionLabel]
             .forEach(contentStack.addArrangedSubview)
-        contentStack.setCustomSpacing(Theme.Spacing.large, after: imageContainer)
-        contentStack.setCustomSpacing(Theme.Spacing.xLarge, after: ratingLabel)
+        contentStack.setCustomSpacing(Theme.Spacing.large + 4, after: productImageView)
+        contentStack.setCustomSpacing(Theme.Spacing.xLarge, after: ratingView)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
@@ -165,26 +146,8 @@ final class ProductDetailViewController: UIViewController {
     }
 
     private func configureImage() {
-        imageContainer.backgroundColor = Theme.Color.imageBackground
-        imageContainer.layer.cornerRadius = Theme.Radius.card
-        imageContainer.layer.cornerCurve = .continuous
-        imageContainer.layer.borderColor = UIColor.separator.cgColor
-        imageContainer.layer.borderWidth = Self.hairline
-        imageContainer.clipsToBounds = true
-
-        imageView.tintColor = Theme.Color.placeholderTint
-        imageView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .largeTitle)
-        imageView.isAccessibilityElement = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageContainer.addSubview(imageView)
-
-        NSLayoutConstraint.activate([
-            imageContainer.heightAnchor.constraint(equalTo: imageContainer.widthAnchor, multiplier: 0.85),
-            imageView.topAnchor.constraint(equalTo: imageContainer.topAnchor, constant: Theme.Spacing.xLarge),
-            imageView.bottomAnchor.constraint(equalTo: imageContainer.bottomAnchor, constant: -Theme.Spacing.xLarge),
-            imageView.leadingAnchor.constraint(equalTo: imageContainer.leadingAnchor, constant: Theme.Spacing.xLarge),
-            imageView.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor, constant: -Theme.Spacing.xLarge),
-        ])
+        productImageView.padding = Theme.Spacing.xLarge
+        productImageView.isAccessibilityElement = true
     }
 
     private func configureLabels() {
@@ -198,8 +161,8 @@ final class ProductDetailViewController: UIViewController {
         priceLabel.font = UIFont.preferredFont(forTextStyle: .title3).bold()
         priceLabel.textColor = Theme.Color.primaryText
 
-        ratingLabel.font = UIFont.preferredFont(forTextStyle: .subheadline)
-        ratingLabel.textColor = Theme.Color.rating
+        ratingView.font = UIFont.preferredFont(forTextStyle: .subheadline)
+        ratingView.isAccessibilityElement = true
 
         descriptionHeaderLabel.text = "Description"
         descriptionHeaderLabel.font = Theme.Font.sectionTitle
@@ -209,7 +172,7 @@ final class ProductDetailViewController: UIViewController {
         descriptionLabel.font = Theme.Font.body
         descriptionLabel.textColor = Theme.Color.secondaryText
 
-        [categoryLabel, titleLabel, priceLabel, ratingLabel, descriptionHeaderLabel, descriptionLabel].forEach {
+        [categoryLabel, titleLabel, priceLabel, descriptionHeaderLabel, descriptionLabel].forEach {
             $0.numberOfLines = 0
             $0.adjustsFontForContentSizeCategory = true
         }

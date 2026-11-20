@@ -37,14 +37,16 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(navigationController.viewControllers.last?.title, "Jewelery")
     }
 
-    func testShowSearchPushesTheSearchScreen() {
-        let (sut, navigationController) = makeSUT()
-        sut.start()
+    func testHomeHostsSearchInTheSameScreen() {
+        let (sut, _) = makeSUT()
 
-        sut.showSearch()
+        let home = sut.makeHome()
+        home.loadViewIfNeeded()
 
-        XCTAssertTrue(navigationController.viewControllers.last is SearchViewController)
-        XCTAssertEqual(navigationController.viewControllers.last?.title, "Search")
+        let searchController = home.navigationItem.searchController
+        XCTAssertTrue(searchController?.searchResultsController is SearchViewController)
+        XCTAssertTrue(searchController?.searchResultsUpdater === searchController?.searchResultsController)
+        XCTAssertFalse(home.navigationItem.hidesSearchBarWhenScrolling)
     }
 
     func testShowProductDetailPushesTheDetailScreen() {

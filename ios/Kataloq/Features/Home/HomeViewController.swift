@@ -35,6 +35,7 @@ final class HomeViewController: UIViewController {
 
     private let viewModel: HomeViewModel
     private let imageLoader: any ImageLoading
+    private let searchResultsController: SearchViewController
 
     private lazy var collectionView = UICollectionView(frame: .zero, collectionViewLayout: makeLayout())
     private lazy var dataSource = makeDataSource()
@@ -42,8 +43,9 @@ final class HomeViewController: UIViewController {
     private let refreshControl = UIRefreshControl()
     private var loadTask: Task<Void, Never>?
 
-    init(viewModel: HomeViewModel, imageLoader: any ImageLoading) {
+    init(viewModel: HomeViewModel, searchResultsController: SearchViewController, imageLoader: any ImageLoading) {
         self.viewModel = viewModel
+        self.searchResultsController = searchResultsController
         self.imageLoader = imageLoader
         super.init(nibName: nil, bundle: nil)
         title = viewModel.title
@@ -68,13 +70,29 @@ final class HomeViewController: UIViewController {
 
     // MARK: - Setup
 
+    /// Search bar at the top of Home, under the large title and above the categories.
+    /// Results appear over Home in the same screen (`SearchViewController` is the search
+    /// controller's results view) and update as the user types.
     private func configureNavigationItem() {
-        let searchButton = UIBarButtonItem(
-            systemItem: .search,
-            primaryAction: UIAction { [weak self] _ in self?.viewModel.requestSearch() }
-        )
-        searchButton.accessibilityLabel = "Search products"
-        navigationItem.rightBarButtonItem = searchButton
+        let searchController = UISearchController(searchResultsController: searchResultsController)
+        searchController.searchResultsUpdater = searchResultsController
+        searchController.obscuresBackgroundDuringPresentation = false
+        let searchBar = searchController.searchBar
+        searchBar.delegate = searchResultsController
+        searchBar.placeholder = "Search products"
+        searchBar.returnKeyType = .search
+        searchBar.autocorrectionType = .no
+        searchBar.searchTextField.accessibilityLabel = "Search products"
+
+        navigationItem.searchController = searchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        navigationItem.preferredSearchBarPlacement = .stacked
+        if #available(iOS 26.0, *) {
+            // iOS 26 otherwise moves the search field into a bottom toolbar on iPhone.
+            navigationItem.searchBarPlacementAllowsToolbarIntegration = false
+        }
+        // Pushing a product from the results keeps the search (and its results) when coming back.
+        definesPresentationContext = true
     }
 
     private func configureCollectionView() {
@@ -163,8 +181,12 @@ final class HomeViewController: UIViewController {
     private func makeDataSource() -> UICollectionViewDiffableDataSource<Section, Item> {
         let imageLoader = self.imageLoader
 
-        let productRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
-            cell.configure(with: item, imageLoader: imageLoader)
+        // One cell class, two styles: the section decides how a product is presented.
+        let featuredRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
+            cell.configure(with: item, style: .featured, imageLoader: imageLoader)
+        }
+        let standardRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
+            cell.configure(with: item, style: .standard, imageLoader: imageLoader)
         }
         let categoryRegistration = UICollectionView.CellRegistration<CategoryChipCell, ProductCategory> { cell, _, category in
             cell.configure(with: category)
@@ -180,8 +202,10 @@ final class HomeViewController: UIViewController {
             switch item {
             case .category(let category):
                 return collectionView.dequeueConfiguredReusableCell(using: categoryRegistration, for: indexPath, item: category)
-            case .featured(let product), .product(let product):
-                return collectionView.dequeueConfiguredReusableCell(using: productRegistration, for: indexPath, item: product)
+            case .featured(let product):
+                return collectionView.dequeueConfiguredReusableCell(using: featuredRegistration, for: indexPath, item: product)
+            case .product(let product):
+                return collectionView.dequeueConfiguredReusableCell(using: standardRegistration, for: indexPath, item: product)
             }
         }
         dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
@@ -191,12 +215,12 @@ final class HomeViewController: UIViewController {
     }
 
     private func makeLayout() -> UICollectionViewLayout {
-        UICollectionViewCompositionalLayout { [weak self] sectionIndex, _ in
+        UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
             guard let section = self?.dataSource.sectionIdentifier(for: sectionIndex) else { return nil }
             switch section {
             case .categories: return LayoutSections.chipRow()
-            case .featured: return LayoutSections.productCarousel()
-            case .allProducts: return LayoutSections.productGrid()
+            case .featured: return LayoutSections.productCarousel(environment: environment)
+            case .allProducts: return LayoutSections.productGrid(environment: environment)
             }
         }
     }

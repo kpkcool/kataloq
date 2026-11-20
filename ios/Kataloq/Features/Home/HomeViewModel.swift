@@ -24,7 +24,6 @@ final class HomeViewModel {
     // Navigation intents, handled by the coordinator.
     var onProductSelected: ((String) -> Void)?
     var onCategorySelected: ((ProductCategory) -> Void)?
-    var onSearchRequested: (() -> Void)?
 
     private let repository: any ProductRepository
     private let locale: Locale
@@ -70,9 +69,5 @@ final class HomeViewModel {
 
     func selectCategory(_ category: ProductCategory) {
         onCategorySelected?(category)
-    }
-
-    func requestSearch() {
-        onSearchRequested?()
     }
 }

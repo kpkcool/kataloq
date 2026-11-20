@@ -1,7 +1,8 @@
 import UIKit
 
-/// Search: a search field in the navigation bar; results in a 2-column grid.
-/// The search runs when the user taps the keyboard's Search button (the brief's "search button").
+/// Search results, shown over Home by Home's search bar (it is that `UISearchController`'s
+/// results controller), in a 2-column grid. Results update as the user types and immediately
+/// when they tap the keyboard's Search button (the brief's "search button").
 final class SearchViewController: UIViewController {
     private enum Section: Hashable {
         case results
@@ -10,18 +11,15 @@ final class SearchViewController: UIViewController {
     private let viewModel: SearchViewModel
     private let imageLoader: any ImageLoading
 
-    private let searchController = UISearchController(searchResultsController: nil)
     private lazy var collectionView = UICollectionView(frame: .zero, collectionViewLayout: makeLayout())
     private lazy var dataSource = makeDataSource()
     private let stateView = StateView()
     private var resultsTitle = ""
-    private var hasAppeared = false
 
     init(viewModel: SearchViewModel, imageLoader: any ImageLoading) {
         self.viewModel = viewModel
         self.imageLoader = imageLoader
         super.init(nibName: nil, bundle: nil)
-        title = viewModel.title
     }
 
     required init?(coder: NSCoder) {
@@ -31,8 +29,6 @@ final class SearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
-        navigationItem.largeTitleDisplayMode = .never
-        configureSearchController()
         configureCollectionView()
         viewModel.onStateChange = { [weak self] state in
             self?.render(state)
@@ -40,29 +36,7 @@ final class SearchViewController: UIViewController {
         render(viewModel.state)
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        // Focus the field the first time, so the keyboard is ready when the screen opens.
-        guard !hasAppeared else { return }
-        hasAppeared = true
-        searchController.searchBar.becomeFirstResponder()
-    }
-
     // MARK: - Setup
-
-    private func configureSearchController() {
-        searchController.obscuresBackgroundDuringPresentation = false
-        searchController.hidesNavigationBarDuringPresentation = false
-        searchController.searchBar.placeholder = viewModel.placeholder
-        searchController.searchBar.returnKeyType = .search
-        searchController.searchBar.enablesReturnKeyAutomatically = true
-        searchController.searchBar.autocorrectionType = .no
-        searchController.searchBar.delegate = self
-        searchController.searchBar.accessibilityLabel = "Search products"
-        navigationItem.searchController = searchController
-        navigationItem.hidesSearchBarWhenScrolling = false
-        definesPresentationContext = true
-    }
 
     private func configureCollectionView() {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -129,7 +103,7 @@ final class SearchViewController: UIViewController {
         let imageLoader = self.imageLoader
 
         let productRegistration = UICollectionView.CellRegistration<ProductCardCell, ProductCardViewData> { cell, _, item in
-            cell.configure(with: item, imageLoader: imageLoader)
+            cell.configure(with: item, style: .standard, imageLoader: imageLoader)
         }
         let headerRegistration = UICollectionView.SupplementaryRegistration<SectionHeaderView>(
             elementKind: UICollectionView.elementKindSectionHeader
@@ -149,15 +123,21 @@ final class SearchViewController: UIViewController {
     }
 
     private func makeLayout() -> UICollectionViewLayout {
-        UICollectionViewCompositionalLayout { _, _ in
-            LayoutSections.productGrid()
+        UICollectionViewCompositionalLayout { _, environment in
+            LayoutSections.productGrid(environment: environment)
         }
     }
 }
 
-// MARK: - UISearchBarDelegate
+// MARK: - Search input
 
-extension SearchViewController: UISearchBarDelegate {
+extension SearchViewController: UISearchResultsUpdating, UISearchBarDelegate {
+    /// Every change to the field, including clearing it and cancelling the search.
+    func updateSearchResults(for searchController: UISearchController) {
+        viewModel.queryChanged(searchController.searchBar.text ?? "")
+    }
+
+    /// The keyboard's Search button: search now, without waiting for the typing pause.
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
         viewModel.submitSearch(searchBar.text ?? "")
@@ -165,13 +145,6 @@ extension SearchViewController: UISearchBarDelegate {
 
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         viewModel.clear()
-    }
-
-    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        // Clearing the field (the ⓧ button) returns to the prompt.
-        if searchText.isEmpty {
-            viewModel.clear()
-        }
     }
 }
 

@@ -112,18 +112,14 @@ final class HomeViewModelTests: XCTestCase {
         let (sut, _, _) = makeSUT()
         var selectedProduct: String?
         var selectedCategory: ProductCategory?
-        var searchRequested = false
         sut.onProductSelected = { selectedProduct = $0 }
         sut.onCategorySelected = { selectedCategory = $0 }
-        sut.onSearchRequested = { searchRequested = true }
 
         sut.selectProduct(id: "9")
         sut.selectCategory(Fixtures.jewelery)
-        sut.requestSearch()
 
         XCTAssertEqual(selectedProduct, "9")
         XCTAssertEqual(selectedCategory, Fixtures.jewelery)
-        XCTAssertTrue(searchRequested)
     }
 }
 

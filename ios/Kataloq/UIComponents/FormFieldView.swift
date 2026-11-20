@@ -2,6 +2,19 @@ import UIKit
 
 /// A labelled form input with an inline error: single-line (UITextField) or multi-line (UITextView).
 final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
+    /// Shown next to the title: a red "*" for required, a light-grey "(optional)" for optional.
+    enum Requirement {
+        case required
+        case optional
+
+        var spokenText: String {
+            switch self {
+            case .required: return "required"
+            case .optional: return "optional"
+            }
+        }
+    }
+
     enum Kind {
         case singleLine(contentType: UITextContentType?, keyboard: UIKeyboardType, capitalization: UITextAutocapitalizationType)
         case multiLine
@@ -17,9 +30,13 @@ final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
     private var textField: UITextField?
     private var textView: UITextView?
     private let fieldTitle: String
+    private let requirement: Requirement
+    /// What VoiceOver reads for the input, e.g. "Name, required".
+    private var spokenTitle: String { "\(fieldTitle), \(requirement.spokenText)" }
 
-    init(title: String, kind: Kind, returnKey: UIReturnKeyType = .next) {
+    init(title: String, requirement: Requirement, kind: Kind, returnKey: UIReturnKeyType = .next) {
         fieldTitle = title
+        self.requirement = requirement
         super.init(frame: .zero)
         setUpViews(kind: kind, returnKey: returnKey)
     }
@@ -61,9 +78,7 @@ final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
     // MARK: - Setup
 
     private func setUpViews(kind: Kind, returnKey: UIReturnKeyType) {
-        titleLabel.text = fieldTitle
-        titleLabel.font = UIFont.preferredFont(forTextStyle: .subheadline).bold()
-        titleLabel.textColor = Theme.Color.primaryText
+        titleLabel.attributedText = makeTitle()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.isAccessibilityElement = false // the input carries the label
 
@@ -90,7 +105,7 @@ final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
             field.returnKeyType = returnKey
             field.font = Theme.Font.body
             field.adjustsFontForContentSizeCategory = true
-            field.accessibilityLabel = fieldTitle
+            field.accessibilityLabel = spokenTitle
             field.delegate = self
             field.addAction(UIAction { [weak self, weak field] _ in
                 self?.onTextChange?(field?.text ?? "")
@@ -106,9 +121,12 @@ final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
             textArea.isScrollEnabled = false
             textArea.textContainerInset = UIEdgeInsets(top: 10, left: 0, bottom: 10, right: 0)
             textArea.textContainer.lineFragmentPadding = 0
-            textArea.accessibilityLabel = fieldTitle
+            textArea.accessibilityLabel = spokenTitle
             textArea.delegate = self
             textArea.heightAnchor.constraint(greaterThanOrEqualToConstant: 110).isActive = true
+            // The text area is the one view in a form that may grow to use spare height
+            // (forms pin it to fill the screen down to their button).
+            textArea.setContentHuggingPriority(.defaultLow - 1, for: .vertical)
             textView = textArea
             input = textArea
         }
@@ -133,6 +151,30 @@ final class FormFieldView: UIView, UITextFieldDelegate, UITextViewDelegate {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
+    }
+
+    private func makeTitle() -> NSAttributedString {
+        let titleFont = UIFont.preferredFont(forTextStyle: .subheadline).bold()
+        let title = NSMutableAttributedString(
+            string: fieldTitle,
+            attributes: [.font: titleFont, .foregroundColor: Theme.Color.primaryText]
+        )
+        switch requirement {
+        case .required:
+            title.append(NSAttributedString(
+                string: " *",
+                attributes: [.font: titleFont, .foregroundColor: Theme.Color.error]
+            ))
+        case .optional:
+            title.append(NSAttributedString(
+                string: " (optional)",
+                attributes: [
+                    .font: UIFont.preferredFont(forTextStyle: .subheadline),
+                    .foregroundColor: Theme.Color.secondaryText,
+                ]
+            ))
+        }
+        return title
     }
 
     // MARK: - Delegates

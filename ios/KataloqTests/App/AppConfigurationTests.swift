@@ -41,9 +41,20 @@ final class ProductFormattingTests: XCTestCase {
         XCTAssertEqual(ProductFormatting.rating(Rating(average: 4, count: 1), locale: locale), "★ 4.0 (1)")
     }
 
-    func testRatingValueOmitsTheStarForIconLayouts() {
-        XCTAssertEqual(ProductFormatting.ratingValue(Rating(average: 4.6, count: 400), locale: locale), "4.6 (400)")
-        XCTAssertEqual(ProductFormatting.ratingValue(Rating(average: 0, count: 0), locale: locale), "No ratings yet")
+    func testRatingScoreAndCountAreSeparateForIconLayouts() {
+        let rating = Rating(average: 4.6, count: 1250)
+        XCTAssertEqual(ProductFormatting.ratingScore(rating, locale: locale), "4.6")
+        XCTAssertEqual(ProductFormatting.ratingCount(rating, locale: locale), "(1,250)")
+    }
+
+    func testCardViewDataCarriesScoreCountAndRatedFlag() {
+        let rated = ProductCardViewData(product: Fixtures.product(average: 4.6, count: 400), locale: locale)
+        XCTAssertEqual(rated.ratingScoreText, "4.6")
+        XCTAssertEqual(rated.ratingCountText, "(400)")
+        XCTAssertTrue(rated.isRated)
+
+        let unrated = ProductCardViewData(product: Fixtures.product(average: 0, count: 0), locale: locale)
+        XCTAssertFalse(unrated.isRated)
     }
 
     func testUnratedProductSaysSo() {

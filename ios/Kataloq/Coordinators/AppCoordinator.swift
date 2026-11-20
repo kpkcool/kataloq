@@ -25,8 +25,11 @@ final class AppCoordinator: Coordinator {
         let viewModel = HomeViewModel(repository: dependencies.productRepository)
         viewModel.onProductSelected = { [weak self] productID in self?.showProductDetail(productID: productID) }
         viewModel.onCategorySelected = { [weak self] category in self?.showCategory(category) }
-        viewModel.onSearchRequested = { [weak self] in self?.showSearch() }
-        return HomeViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
+        return HomeViewController(
+            viewModel: viewModel,
+            searchResultsController: makeSearch(),
+            imageLoader: dependencies.imageLoader
+        )
     }
 
     func makeCategory(_ category: ProductCategory) -> CategoryViewController {
@@ -35,6 +38,8 @@ final class AppCoordinator: Coordinator {
         return CategoryViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
     }
 
+    /// Search results shown inside Home (see `HomeViewController`); product taps still go
+    /// through the coordinator.
     func makeSearch() -> SearchViewController {
         let viewModel = SearchViewModel(repository: dependencies.productRepository)
         viewModel.onProductSelected = { [weak self] productID in self?.showProductDetail(productID: productID) }
@@ -70,10 +75,6 @@ final class AppCoordinator: Coordinator {
 
     func showCategory(_ category: ProductCategory) {
         navigationController.pushViewController(makeCategory(category), animated: true)
-    }
-
-    func showSearch() {
-        navigationController.pushViewController(makeSearch(), animated: true)
     }
 
     func showProductDetail(productID: String) {

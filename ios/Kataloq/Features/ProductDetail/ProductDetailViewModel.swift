@@ -6,6 +6,9 @@ struct ProductDetailContent: Equatable {
     let categoryName: String
     let priceText: String
     let ratingText: String
+    let ratingScoreText: String
+    let ratingCountText: String
+    let isRated: Bool
     let ratingAccessibilityText: String
     let imageURL: URL?
 }
@@ -48,6 +51,9 @@ final class ProductDetailViewModel {
                 categoryName: product.category.name,
                 priceText: ProductFormatting.price(product.price, locale: locale),
                 ratingText: ProductFormatting.rating(product.rating, locale: locale),
+                ratingScoreText: ProductFormatting.ratingScore(product.rating, locale: locale),
+                ratingCountText: ProductFormatting.ratingCount(product.rating, locale: locale),
+                isRated: product.rating.count > 0,
                 ratingAccessibilityText: ProductFormatting.ratingAccessibility(product.rating, locale: locale),
                 imageURL: product.imageURL
             ))

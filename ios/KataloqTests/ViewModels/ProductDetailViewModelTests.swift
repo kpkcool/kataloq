@@ -43,6 +43,9 @@ final class ProductDetailViewModelTests: XCTestCase {
             categoryName: "Men's Clothing",
             priceText: "$109.95",
             ratingText: "★ 3.9 (120)",
+            ratingScoreText: "3.9",
+            ratingCountText: "(120)",
+            isRated: true,
             ratingAccessibilityText: "Rated 3.9 out of 5 from 120 reviews",
             imageURL: URL(string: "https://images.test/1.png")
         )))

@@ -3,10 +3,13 @@ import XCTest
 
 @MainActor
 final class SearchViewModelTests: XCTestCase {
-    private func makeSUT(result: Result<[Product], Error> = .success([])) -> (SearchViewModel, MockProductRepository) {
+    private func makeSUT(
+        result: Result<[Product], Error> = .success([]),
+        typingDelay: Duration = .zero
+    ) -> (SearchViewModel, MockProductRepository) {
         let repository = MockProductRepository()
         repository.searchResult = result
-        let sut = SearchViewModel(repository: repository, locale: Fixtures.usLocale)
+        let sut = SearchViewModel(repository: repository, locale: Fixtures.usLocale, typingDelay: typingDelay)
         trackForMemoryLeaks(sut)
         return (sut, repository)
     }
@@ -115,6 +118,43 @@ final class SearchViewModelTests: XCTestCase {
         sut.clear()
 
         XCTAssertEqual(sut.state, .idle)
+    }
+
+    // MARK: - Search as you type
+
+    func testTypingSearchesAfterThePause() async {
+        let (sut, repository) = makeSUT(result: .success([Fixtures.product(id: "2", title: "Shirt")]))
+
+        sut.queryChanged("shirt")
+        await sut.searchTask?.value
+
+        XCTAssertEqual(repository.calls, ["searchProducts:shirt"])
+        guard case .results(let results) = sut.state else {
+            return XCTFail("Expected results, got \(sut.state)")
+        }
+        XCTAssertEqual(results.products.map(\.id), ["2"])
+    }
+
+    func testFastTypingSendsOnlyTheLastTerm() async {
+        let (sut, repository) = makeSUT(typingDelay: .milliseconds(50))
+
+        sut.queryChanged("s")
+        sut.queryChanged("sh")
+        sut.queryChanged("shirt")
+        await sut.searchTask?.value
+
+        XCTAssertEqual(repository.calls, ["searchProducts:shirt"])
+    }
+
+    func testClearingTheFieldReturnsToThePromptWithoutCallingTheBackend() async {
+        let (sut, repository) = makeSUT(typingDelay: .milliseconds(50))
+
+        sut.queryChanged("shirt")
+        sut.queryChanged("  ")
+        await sut.searchTask?.value
+
+        XCTAssertEqual(sut.state, .idle)
+        XCTAssertTrue(repository.calls.isEmpty)
     }
 
     func testSelectingAResultForwardsItsID() {

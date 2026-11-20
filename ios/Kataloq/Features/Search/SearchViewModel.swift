@@ -24,15 +24,15 @@ struct SearchResults: Equatable {
     }
 }
 
-/// Search screen logic (FR-4). Matching happens on the backend; this ViewModel validates the
-/// term, runs one search at a time, and keeps the backend's result order.
+/// Search logic (FR-4). Matching happens on the backend; this ViewModel validates the term,
+/// runs one search at a time, and keeps the backend's result order.
+///
+/// Two triggers: typing (after a short pause, so "backpack" sends one request rather than eight)
+/// and the keyboard's Search button (immediately).
 @MainActor
 final class SearchViewModel {
     /// Mirrors the backend limit, so the user gets instant feedback instead of a 400.
     static let maxQueryLength = 100
-
-    let title = "Search"
-    let placeholder = "Search products"
 
     private(set) var state: SearchState = .idle {
         didSet { onStateChange?(state) }
@@ -47,10 +47,12 @@ final class SearchViewModel {
 
     private let repository: any ProductRepository
     private let locale: Locale
+    private let typingDelay: Duration
 
-    init(repository: any ProductRepository, locale: Locale = .current) {
+    init(repository: any ProductRepository, locale: Locale = .current, typingDelay: Duration = .milliseconds(300)) {
         self.repository = repository
         self.locale = locale
+        self.typingDelay = typingDelay
     }
 
     deinit {
@@ -62,6 +64,23 @@ final class SearchViewModel {
     func submitSearch(_ text: String) {
         searchTask?.cancel()
         searchTask = Task { [weak self] in
+            await self?.search(text)
+        }
+    }
+
+    /// Called on every change to the search field. Waits `typingDelay` and then searches; each
+    /// keystroke cancels the previous wait (and any search still running). An empty field
+    /// returns to the prompt without calling the backend.
+    func queryChanged(_ text: String) {
+        searchTask?.cancel()
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            clear()
+            return
+        }
+        let delay = typingDelay
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
             await self?.search(text)
         }
     }
