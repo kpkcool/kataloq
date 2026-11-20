@@ -1,0 +1,56 @@
+# Kataloq local stack:  docker compose up --build
+#
+#   kataloq-api   http://localhost:3000      REST API used by the iOS app
+#   mailpit       http://localhost:8025      web inbox where enquiry emails arrive
+#                 localhost:1025             SMTP (the API sends here)
+#
+# No .env file is needed. Every setting has a default in the backend
+# (see backend/.env.example). To override one, export it or put it in a ./.env
+# file next to this one, e.g.  FEATURED_PRODUCT_IDS=2,3,4,6,7
+# Host ports can be changed if they are taken: KATALOQ_API_PORT, MAILPIT_UI_PORT, MAILPIT_SMTP_PORT.
+
+name: kataloq
+
+services:
+  mailpit:
+    # Pinned to an exact image (digest) so every reviewer runs the same Mailpit.
+    image: axllent/mailpit@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kataloq-api:
+    build: ./backend
+    image: kataloq-api:local
+    ports:
+      - "${KATALOQ_API_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      # Inside Compose, the SMTP server is the mailpit service.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      # Optional overrides. Empty means "use the backend default".
+      LOG_LEVEL: ${LOG_LEVEL:-}
+      FAKE_STORE_BASE_URL: ${FAKE_STORE_BASE_URL:-}
+      UPSTREAM_TIMEOUT_MS: ${UPSTREAM_TIMEOUT_MS:-}
+      PRODUCT_CACHE_TTL_SECONDS: ${PRODUCT_CACHE_TTL_SECONDS:-}
+      FEATURED_PRODUCT_IDS: ${FEATURED_PRODUCT_IDS:-}
+      CATEGORY_TOP_RATED_COUNT: ${CATEGORY_TOP_RATED_COUNT:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SALES_INBOX_EMAIL: ${SALES_INBOX_EMAIL:-}
+      ENQUIRY_RATE_LIMIT_PER_MINUTE: ${ENQUIRY_RATE_LIMIT_PER_MINUTE:-}
+    depends_on:
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
