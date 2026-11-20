@@ -1,6 +1,6 @@
 # Kataloq – Decisions and Assumptions
 
-> **Living document (approved architecture; updated during Phase 3 implementation).** Written before implementation. Every entry will be checked against the actual code in Phase 7, and anything that changed during the build will be updated with the reason.
+> Assumptions, decisions and trade-offs for Kataloq. Written during planning and updated as the backend (Phase 3) and iOS app (Phase 4) were built; §6 records where the implementation refined the plan and why.
 
 ## 1. Technology choices
 
@@ -69,7 +69,9 @@
 - **Product images:** loaded directly from the backend-supplied URL (AD-15). The rule against calling Fake Store from the app covers product data, not static image delivery. Future: our own image CDN / object storage.
 - **Fake Store sometimes returns a Cloudflare challenge** (`403`, `cf-mitigated: challenge`, seen on 2026-11-19). We surface it as 502 and don't try to bypass it (AD-16).
 
-## 6. Implementation notes (Phase 3)
+## 6. Implementation notes
+
+### Backend (Phase 3)
 
 | Decision | Detail | Why |
 |---|---|---|
@@ -91,6 +93,24 @@
 | Mailpit pinned by image digest in Compose | Exact image every time. | Reproducible reviewer setup. |
 | Backend image: multi-stage `node:26-alpine`, production deps only, runs as `node` (non-root) | Same image runs locally and on ECS/App Runner. | Smaller attack surface; AWS-compatible. |
 | JSON-lines logger instead of a logging library | ~50 lines, injectable, silent in tests. | Avoids a dependency; JSON lines are what CloudWatch expects. |
+
+### iOS implementation notes (Phase 4)
+
+| Decision | Detail | Why |
+|---|---|---|
+| Explicit `@MainActor`, not Xcode 27's "main actor by default" | The template's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` was removed; ViewModels, coordinator and UI are marked `@MainActor`; networking types are `Sendable`. | Networking and decoding aren't tied to the main thread, and isolation is visible in the code (easier to explain and review). |
+| Programmatic UIKit, no storyboard | `SceneDelegate` builds the window; `Main.storyboard` removed. | Views and constraints are reviewable in diffs; no storyboard merge conflicts. |
+| ViewModel → View binding with a state enum and an `onStateChange` closure | `LoadState<Value>` (idle/loading/loaded/empty/failed); Search and Enquiry have their own state enums because they have more states. | No Combine needed on iOS 16 (Observation is iOS 17+). Tests just `await viewModel.load()` and assert `state`. |
+| Load tasks capture the ViewModel, not the ViewController | `Task { await viewModel.load() }`, cancelled in `deinit`. | Leaving a screen deallocates it and cancels its request; cancellation never shows an error. |
+| Search runs only on the keyboard's Search button; a new search cancels the previous one | Blank / >100-char terms are rejected locally. | Matches the brief ("click the search button"); a slow old response can't overwrite new results; no pointless 400s. |
+| Product detail fetches by ID | Even when the list already had the product. | Same behaviour from any entry point (incl. future deep links). |
+| Enquiry flow: modal sheet with its own navigation controller; success **replaces** the form with Thank you | Cancel/Done dismiss; swipe-to-dismiss is blocked while sending; no automatic retries. | There is no "back" to a sent form, and each submit sends a real email. |
+| Client validation mirrors the backend; server field errors shown inline | `EnquiryFormValidator`; a 400 with `details` maps onto the same fields. | Fast feedback, while the backend stays authoritative. |
+| Home "Featured" and Category "Top Rated" as horizontal, snapping carousels; "All Products" and search results as a 2-column grid | Engineer's UI direction after the first screenshot ("horizontal scrolling like shopping apps"). Shared `LayoutSections`. | Familiar shopping-app pattern. The first grid used `repeatingSubitem:count:` and overflowed the screen; items are now explicitly half-width with insets. |
+| Category icons mapped from category id; unknown ids get a generic tag icon | Presentation-only mapping. | Nicer chips without coupling behaviour to Fake Store's category list. |
+| Lists drop duplicate product IDs before display | Keeps first occurrence and order. | Diffable data sources crash on duplicates; a malformed response must not crash the app (code review R1). |
+| No DTO layer, and `ProductCategory` instead of `Category` | Models decode our API directly; `Category` would clash with the Objective-C runtime type. | The backend is already the anti-corruption layer. |
+| Unit tests skip the real UI | `SceneDelegate` installs an empty root controller when running under XCTest. | Tests never start the app's network calls. |
 
 ## 7. Security basics
 
@@ -114,15 +134,22 @@
 
 ## 9. What I'd do next with another day
 
-*(Draft — to be finalised in Phase 7 against what was actually built.)*
-
 1. Persist enquiries and send email from an outbox with retries (no lost leads when the provider is down); add an idempotency key to `POST /enquiries`.
 2. OpenAPI spec generated from the zod schemas; contract tests shared by iOS fixtures and the backend.
 3. CI (GitHub Actions): backend typecheck + tests, `xcodebuild test` on a simulator.
 4. An opt-in fixture-backed `ProductProvider` (`PRODUCT_PROVIDER=fixture`) for offline demos, deterministic E2E tests, and networks where Fake Store's Cloudflare protection challenges requests. Considered during planning and deferred: Node `fetch` reached Fake Store fine, and it's off the acceptance-criteria path.
-5. Image caching to disk, accessibility audit (Dynamic Type, VoiceOver order), snapshot tests.
-6. Deploy: backend container to AWS App Runner/ECS, SES as `EmailProvider`, secrets in SSM/Secrets Manager.
+5. Snapshot tests for every screen and an XCUITest smoke test against a fixture backend; image disk cache with in-flight request de-duplication; a full accessibility audit.
+6. Move the enquiry rate limiter in front of body parsing and onto a shared store (Redis / API Gateway) for multiple instances.
+7. Deploy: backend container to AWS App Runner/ECS, SES as `EmailProvider`, secrets in SSM/Secrets Manager.
 
 ## 10. Time spent
 
-*(Filled in honestly at the end: planning / building / testing / reviewing.)*
+Wall-clock windows from the working session on 2026-11-19 (IST). They include time spent waiting for test runs on the Mac; **the engineer should adjust these to actual effort before submitting.**
+
+| Activity | Window | Approx. |
+|---|---|---|
+| Planning: requirements analysis, architecture, decisions | 16:17 – 17:00 | 45 min |
+| Building: backend (5 increments, tested after each) | 17:00 – 18:30 | 1 h 30 min |
+| Building: iOS app (5 screens) | 21:16 – 22:56 | 1 h 40 min |
+| Testing and reviewing: code review, fixes, verification script, docs | 22:56 – end | *to fill in* |
+| **Total** | | **≈ 4 h +** (over the 2–3 h guide; the full planning/review process and step-by-step verification were the main reasons) |

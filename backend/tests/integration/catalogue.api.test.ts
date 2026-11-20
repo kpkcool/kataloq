@@ -250,6 +250,15 @@ describe('Catalogue API', () => {
       expect(response.headers['x-powered-by']).toBeUndefined();
     });
 
+    it('logs health checks at debug level only, so they do not flood the logs', async () => {
+      const { app, logLines } = setup();
+
+      await request(app).get('/health');
+
+      const line = logLines.find((entry) => entry['msg'] === 'request completed');
+      expect(line).toEqual(expect.objectContaining({ level: 'debug', path: '/health' }));
+    });
+
     it('logs one line per request with method, path and status, but not the query string', async () => {
       const { app, logLines } = setup();
 

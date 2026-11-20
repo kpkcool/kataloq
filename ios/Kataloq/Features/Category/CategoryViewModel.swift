@@ -40,9 +40,13 @@ final class CategoryViewModel {
             if page.topRated.isEmpty && page.additional.isEmpty {
                 state = .empty(message: "There are no products in \(category.name) yet.")
             } else {
+                // The backend never repeats a product across sections; guard anyway (see uniquedByID).
+                let topRated = page.topRated.uniquedByID()
+                let topRatedIDs = Set(topRated.map(\.id))
+                let allProducts = page.additional.filter { !topRatedIDs.contains($0.id) }.uniquedByID()
                 state = .loaded(CategoryContent(
-                    topRated: page.topRated.map { ProductCardViewData(product: $0, locale: locale) },
-                    allProducts: page.additional.map { ProductCardViewData(product: $0, locale: locale) }
+                    topRated: topRated.map { ProductCardViewData(product: $0, locale: locale) },
+                    allProducts: allProducts.map { ProductCardViewData(product: $0, locale: locale) }
                 ))
             }
         } catch is CancellationError {

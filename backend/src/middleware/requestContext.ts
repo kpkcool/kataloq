@@ -35,9 +35,11 @@ export function requestContext(logger: Logger): RequestHandler {
     // originalUrl is never rewritten by mounted routers (req.path can be); drop the query string.
     const path = req.originalUrl.split('?')[0] ?? req.originalUrl;
     const startedAt = process.hrtime.bigint();
+    // Health checks run every few seconds (Compose, load balancers): log them at debug only.
+    const level = path === '/health' ? 'debug' : 'info';
     res.on('finish', () => {
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
-      res.locals.logger.info('request completed', {
+      res.locals.logger[level]('request completed', {
         method: req.method,
         path,
         status: res.statusCode,

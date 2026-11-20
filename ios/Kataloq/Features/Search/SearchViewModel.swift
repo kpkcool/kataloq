@@ -107,7 +107,7 @@ final class SearchViewModel {
             } else {
                 state = .results(SearchResults(
                     query: query,
-                    products: products.map { ProductCardViewData(product: $0, locale: locale) }
+                    products: products.uniquedByID().map { ProductCardViewData(product: $0, locale: locale) }
                 ))
             }
         } catch is CancellationError {

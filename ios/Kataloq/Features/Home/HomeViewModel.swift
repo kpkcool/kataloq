@@ -49,7 +49,7 @@ final class HomeViewModel {
             } else {
                 state = .loaded(HomeContent(
                     categories: categories,
-                    featured: featured.map { ProductCardViewData(product: $0, locale: locale) }
+                    featured: featured.uniquedByID().map { ProductCardViewData(product: $0, locale: locale) }
                 ))
             }
         } catch is CancellationError {

@@ -59,6 +59,16 @@ final class CategoryViewModelTests: XCTestCase {
         XCTAssertTrue(content.allProducts.isEmpty)
     }
 
+    func testDuplicateProductsInAMalformedResponseAreDroppedInsteadOfCrashing() async {
+        let (sut, _) = makeSUT(result: .success(page(topRated: ["1", "2", "2"], additional: ["2", "3", "3"])))
+
+        await sut.load()
+
+        guard case .loaded(let content) = sut.state else { return XCTFail("Expected loaded, got \(sut.state)") }
+        XCTAssertEqual(content.topRated.map(\.id), ["1", "2"])
+        XCTAssertEqual(content.allProducts.map(\.id), ["3"])
+    }
+
     func testEmptyCategoryShowsEmptyState() async {
         let (sut, _) = makeSUT(result: .success(page(topRated: [], additional: [])))
 

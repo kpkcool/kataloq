@@ -47,6 +47,25 @@ final class AppCoordinator: Coordinator {
         return ProductDetailViewController(viewModel: viewModel, imageLoader: dependencies.imageLoader)
     }
 
+    /// The enquiry flow lives in its own navigation controller, presented as a sheet.
+    /// On success the form is *replaced* by the thank-you screen, so there's no way "back" to a sent form.
+    func makeEnquiryFlow(for product: Product) -> UINavigationController {
+        let viewModel = EnquiryViewModel(product: product, repository: dependencies.enquiryRepository)
+        let modal = UINavigationController(rootViewController: EnquiryViewController(viewModel: viewModel))
+
+        viewModel.onCancel = { [weak self] in self?.dismissEnquiry() }
+        viewModel.onSubmitted = { [weak self, weak modal] confirmation, replyEmail in
+            guard let self, let modal else { return }
+            let content = ThankYouContent(productTitle: product.title, replyEmail: replyEmail, enquiryID: confirmation.enquiryId)
+            modal.setViewControllers([self.makeThankYou(content)], animated: true)
+        }
+        return modal
+    }
+
+    func makeThankYou(_ content: ThankYouContent) -> ThankYouViewController {
+        ThankYouViewController(content: content, onDone: { [weak self] in self?.dismissEnquiry() })
+    }
+
     // MARK: - Navigation
 
     func showCategory(_ category: ProductCategory) {
@@ -61,6 +80,11 @@ final class AppCoordinator: Coordinator {
         navigationController.pushViewController(makeProductDetail(productID: productID), animated: true)
     }
 
-    // Added in Phase 4, step 5 (enquiry form + thank-you).
-    func showEnquiry(for product: Product) {}
+    func showEnquiry(for product: Product) {
+        navigationController.present(makeEnquiryFlow(for: product), animated: true)
+    }
+
+    func dismissEnquiry() {
+        navigationController.dismiss(animated: true)
+    }
 }

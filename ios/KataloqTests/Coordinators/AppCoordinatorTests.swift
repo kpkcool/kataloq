@@ -56,6 +56,26 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(navigationController.viewControllers.last is ProductDetailViewController)
     }
 
+    func testEnquiryFlowStartsWithTheFormInItsOwnNavigationController() {
+        let (sut, _) = makeSUT()
+
+        let flow = sut.makeEnquiryFlow(for: Fixtures.product(id: "1", title: "Backpack"))
+
+        XCTAssertEqual(flow.viewControllers.count, 1)
+        XCTAssertTrue(flow.viewControllers.first is EnquiryViewController)
+        XCTAssertEqual(flow.viewControllers.first?.title, "Enquiry")
+        trackForMemoryLeaks(flow)
+    }
+
+    func testThankYouScreen() {
+        let (sut, _) = makeSUT()
+
+        let thankYou = sut.makeThankYou(ThankYouContent(productTitle: "Backpack", replyEmail: "jane@example.com", enquiryID: "e1"))
+
+        XCTAssertEqual(thankYou.title, "Enquiry sent")
+        trackForMemoryLeaks(thankYou)
+    }
+
     func testScreensDoNotRetainTheCoordinator() {
         let (sut, _) = makeSUT()
         let home = sut.makeHome()
