@@ -21,6 +21,7 @@ final class MockAPIClient: APIClient, @unchecked Sendable {
 
 final class MockProductRepository: ProductRepository, @unchecked Sendable {
     var featuredResult: Result<[Product], Error> = .success([])
+    var allProductsResult: Result<[Product], Error> = .success([])
     var categoriesResult: Result<[ProductCategory], Error> = .success([])
     var categoryProductsResult: Result<CategoryProducts, Error> = .failure(MockError.notStubbed)
     var searchResult: Result<[Product], Error> = .success([])
@@ -31,6 +32,11 @@ final class MockProductRepository: ProductRepository, @unchecked Sendable {
     func featuredProducts() async throws -> [Product] {
         calls.append("featuredProducts")
         return try featuredResult.get()
+    }
+
+    func allProducts() async throws -> [Product] {
+        calls.append("allProducts")
+        return try allProductsResult.get()
     }
 
     func categories() async throws -> [ProductCategory] {

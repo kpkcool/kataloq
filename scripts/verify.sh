@@ -29,15 +29,23 @@ echo "== 1. Backend: typecheck, unit + integration tests, build"
 pushd backend >/dev/null
 npm ci --no-audit --no-fund >/dev/null 2>&1 || { record "backend npm ci" FAIL ""; }
 if npm run typecheck >/tmp/kataloq-typecheck.log 2>&1; then record "backend typecheck" PASS ""; else record "backend typecheck" FAIL "see /tmp/kataloq-typecheck.log"; fi
-npx vitest run --reporter=default >/tmp/kataloq-vitest.log 2>&1; VITEST=$?
-SUMMARY=$(grep -E "Tests +[0-9]+" /tmp/kataloq-vitest.log | tail -1 | sed 's/^ *//')
+NO_COLOR=1 FORCE_COLOR=0 npx vitest run >/tmp/kataloq-vitest.log 2>&1; VITEST=$?
+# Strip any ANSI colour codes before reading the summary line.
+SUMMARY=$(sed $'s/\x1b\\[[0-9;]*m//g' /tmp/kataloq-vitest.log | grep -E "Tests +[0-9]+" | tail -1 | sed 's/^ *//')
 if [[ $VITEST -eq 0 ]]; then record "backend tests (vitest)" PASS "$SUMMARY"; else record "backend tests (vitest)" FAIL "$SUMMARY"; fi
 if npm run build >/tmp/kataloq-build.log 2>&1; then record "backend build" PASS ""; else record "backend build" FAIL "see /tmp/kataloq-build.log"; fi
 popd >/dev/null
 
 echo "== 2. Docker Compose: build and start kataloq-api + Mailpit"
 docker compose down --remove-orphans >/dev/null 2>&1
-if docker compose up --build -d >/tmp/kataloq-compose.log 2>&1; then record "docker compose up --build" PASS ""; else record "docker compose up --build" FAIL "see /tmp/kataloq-compose.log"; fi
+if docker compose up --build -d >/tmp/kataloq-compose.log 2>&1; then
+  record "docker compose up --build" PASS ""
+else
+  record "docker compose up --build" FAIL "see /tmp/kataloq-compose.log"
+  echo "---- last 25 lines of /tmp/kataloq-compose.log ----"; tail -25 /tmp/kataloq-compose.log
+  echo "---- docker compose ps -a ----"; docker compose ps -a
+  echo "---- what is listening on 3000 / 8025 / 1025 ----"; lsof -nP -iTCP:3000,8025,1025 -sTCP:LISTEN 2>/dev/null || true
+fi
 for _ in $(seq 1 30); do curl -sf "$API/health" >/dev/null && break; sleep 2; done
 HEALTH=$(curl -s "$API/health")
 [[ "$HEALTH" == '{"status":"ok"}' ]] && record "GET /health" PASS "" || record "GET /health" FAIL "$HEALTH"

@@ -5,11 +5,13 @@ import XCTest
 final class HomeViewModelTests: XCTestCase {
     private func makeSUT(
         featured: Result<[Product], Error> = .success([]),
-        categories: Result<[ProductCategory], Error> = .success([])
+        categories: Result<[ProductCategory], Error> = .success([]),
+        allProducts: Result<[Product], Error> = .success([])
     ) -> (HomeViewModel, MockProductRepository, StateRecorder) {
         let repository = MockProductRepository()
         repository.featuredResult = featured
         repository.categoriesResult = categories
+        repository.allProductsResult = allProducts
         let sut = HomeViewModel(repository: repository, locale: Fixtures.usLocale)
         let recorder = StateRecorder()
         sut.onStateChange = { recorder.states.append($0) }
@@ -26,7 +28,8 @@ final class HomeViewModelTests: XCTestCase {
         let backpack = Fixtures.product(id: "1", title: "Backpack", amount: 109.95, average: 3.9, count: 120)
         let (sut, repository, recorder) = makeSUT(
             featured: .success([backpack, Fixtures.product(id: "5")]),
-            categories: .success([Fixtures.electronics, Fixtures.jewelery])
+            categories: .success([Fixtures.electronics, Fixtures.jewelery]),
+            allProducts: .success([backpack, Fixtures.product(id: "2"), Fixtures.product(id: "5")])
         )
 
         await sut.load()
@@ -37,7 +40,8 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertEqual(content.featured.map(\.id), ["1", "5"], "Keeps the backend's configured order")
         XCTAssertEqual(content.featured.first?.priceText, "$109.95")
         XCTAssertEqual(content.featured.first?.ratingText, "★ 3.9 (120)")
-        XCTAssertEqual(Set(repository.calls), ["featuredProducts", "categories"])
+        XCTAssertEqual(content.allProducts.map(\.id), ["1", "2", "5"], "All products in data-source order, featured ones included")
+        XCTAssertEqual(Set(repository.calls), ["featuredProducts", "categories", "allProducts"])
     }
 
     func testFeaturedEmptyButCategoriesPresentIsStillLoaded() async {
@@ -45,7 +49,7 @@ final class HomeViewModelTests: XCTestCase {
 
         await sut.load()
 
-        XCTAssertEqual(sut.state, .loaded(HomeContent(categories: [Fixtures.electronics], featured: [])))
+        XCTAssertEqual(sut.state, .loaded(HomeContent(categories: [Fixtures.electronics], featured: [], allProducts: [])))
     }
 
     func testNothingToShowIsEmptyState() async {
@@ -66,6 +70,14 @@ final class HomeViewModelTests: XCTestCase {
         await sut.load()
 
         XCTAssertEqual(sut.state, .failed(message: "Product data is temporarily unavailable. Please try again."))
+    }
+
+    func testAllProductsFailureShowsTheErrorState() async {
+        let (sut, _, _) = makeSUT(featured: .success([Fixtures.product(id: "1")]), allProducts: .failure(APIError.timeout))
+
+        await sut.load()
+
+        XCTAssertEqual(sut.state, .failed(message: "This is taking longer than expected. Please try again."))
     }
 
     func testBackendNotRunningShowsConnectionMessage() async {

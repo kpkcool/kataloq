@@ -10,7 +10,13 @@ enum ProductFormatting {
     /// "★ 4.6 (400)", or "No ratings yet".
     static func rating(_ rating: Rating, locale: Locale = .current) -> String {
         guard rating.count > 0 else { return "No ratings yet" }
-        return "★ \(average(rating, locale: locale)) (\(rating.count))"
+        return "★ \(ratingValue(rating, locale: locale))"
+    }
+
+    /// "4.6 (400)": for layouts that draw the star as an icon. "No ratings yet" if unrated.
+    static func ratingValue(_ rating: Rating, locale: Locale = .current) -> String {
+        guard rating.count > 0 else { return "No ratings yet" }
+        return "\(average(rating, locale: locale)) (\(rating.count))"
     }
 
     /// "Rated 4.6 out of 5 from 400 reviews", for VoiceOver.

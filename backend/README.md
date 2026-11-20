@@ -77,6 +77,7 @@ Base URL `http://localhost:3000/api/v1`. JSON in and out. Every response has an 
 | Method | Path | Success |
 |---|---|---|
 | GET | `/health` *(no prefix)* | `200 {"status":"ok"}` |
+| GET | `/products` | `200 {"products": Product[]}` (all, data-source order) |
 | GET | `/products/featured` | `200 {"products": Product[]}` |
 | GET | `/categories` | `200 {"categories": Category[]}` |
 | GET | `/categories/:categoryId/products` | `200 {"category", "topRated": Product[], "additional": Product[]}` |

@@ -1,22 +1,21 @@
 import UIKit
 
-/// Product tile: image, title, price, rating. Used by Home, Category and Search.
+/// Product tile in shopping-app style: a white rounded image tile, then title (always two lines'
+/// worth of space), price and rating. Used by Home, Category and Search.
 final class ProductCardCell: UICollectionViewCell {
-    private let imageContainer = UIView()
+    private let imageTile = UIView()
     private let imageView = UIImageView()
-    private let titleLabel = UILabel()
     private let titleContainer = UIView()
+    private let titleLabel = UILabel()
     private let priceLabel = UILabel()
+    private let starView = UIImageView(image: UIImage(systemName: "star.fill"))
     private let ratingLabel = UILabel()
 
-    /// Reserves two lines for the title so every card in a row has the same height.
-    private lazy var titleMinHeight = titleContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 0)
+    /// Exactly two lines tall, so cards in the same row line up whatever the title length.
+    private lazy var titleHeight = titleContainer.heightAnchor.constraint(equalToConstant: 0)
+
     private var imageTask: Task<Void, Never>?
     private var representedImageURL: URL?
-
-    private static var placeholderImage: UIImage? {
-        UIImage(systemName: "photo")
-    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,7 +31,11 @@ final class ProductCardCell: UICollectionViewCell {
     }
 
     override var isHighlighted: Bool {
-        didSet { contentView.alpha = isHighlighted ? 0.7 : 1 }
+        didSet {
+            UIView.animate(withDuration: 0.15) {
+                self.contentView.transform = self.isHighlighted ? CGAffineTransform(scaleX: 0.97, y: 0.97) : .identity
+            }
+        }
     }
 
     override func prepareForReuse() {
@@ -45,12 +48,15 @@ final class ProductCardCell: UICollectionViewCell {
 
     func configure(with item: ProductCardViewData, imageLoader: any ImageLoading) {
         titleLabel.text = item.title
-        titleMinHeight.constant = ceil(titleLabel.font.lineHeight * 2)
+        titleHeight.constant = ceil(titleLabel.font.lineHeight * 2)
         priceLabel.text = item.priceText
-        ratingLabel.text = item.ratingText
+        ratingLabel.text = item.ratingValueText
+        starView.isHidden = !item.isRated
         accessibilityLabel = item.accessibilityLabel
         loadImage(from: item.imageURL, using: imageLoader)
     }
+
+    // MARK: - Image
 
     private func loadImage(from url: URL?, using imageLoader: any ImageLoading) {
         imageTask?.cancel()
@@ -69,76 +75,95 @@ final class ProductCardCell: UICollectionViewCell {
 
     private func showPlaceholder() {
         imageView.contentMode = .center
-        imageView.image = Self.placeholderImage
+        imageView.image = UIImage(systemName: "photo")
     }
 
-    private func setUpViews() {
-        contentView.backgroundColor = Theme.Color.cardBackground
-        contentView.layer.cornerRadius = Theme.Radius.card
-        contentView.layer.cornerCurve = .continuous
-        contentView.clipsToBounds = true
+    // MARK: - Layout
 
+    private func setUpViews() {
         isAccessibilityElement = true
         accessibilityTraits = .button
 
-        imageContainer.backgroundColor = Theme.Color.imageBackground
-        imageContainer.layer.cornerRadius = Theme.Radius.card - 4
-        imageContainer.clipsToBounds = true
-        imageContainer.translatesAutoresizingMaskIntoConstraints = false
+        imageTile.backgroundColor = Theme.Color.imageBackground
+        imageTile.layer.cornerRadius = Theme.Radius.card
+        imageTile.layer.cornerCurve = .continuous
+        imageTile.layer.borderWidth = 1
+        imageTile.layer.borderColor = Theme.Color.hairline.cgColor
+        imageTile.clipsToBounds = true
+        imageTile.translatesAutoresizingMaskIntoConstraints = false
 
         imageView.tintColor = Theme.Color.placeholderTint
         imageView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .title1)
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageContainer.addSubview(imageView)
+        imageTile.addSubview(imageView)
 
         titleLabel.font = Theme.Font.cardTitle
         titleLabel.textColor = Theme.Color.primaryText
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleContainer.addSubview(titleLabel)
 
         priceLabel.font = Theme.Font.price
         priceLabel.textColor = Theme.Color.primaryText
 
+        starView.tintColor = Theme.Color.rating
+        starView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .caption1)
+        starView.setContentHuggingPriority(.required, for: .horizontal)
         ratingLabel.font = Theme.Font.caption
-        ratingLabel.textColor = Theme.Color.rating
+        ratingLabel.textColor = Theme.Color.secondaryText
 
         [titleLabel, priceLabel, ratingLabel].forEach { $0.adjustsFontForContentSizeCategory = true }
 
-        // The title sits at the top of a container that's always at least two lines tall.
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleContainer.addSubview(titleLabel)
+        let ratingRow = UIStackView(arrangedSubviews: [starView, ratingLabel])
+        ratingRow.axis = .horizontal
+        ratingRow.spacing = Theme.Spacing.xSmall
+        ratingRow.alignment = .center
+
+        let textStack = UIStackView(arrangedSubviews: [titleContainer, priceLabel, ratingRow])
+        textStack.axis = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = Theme.Spacing.xSmall
+        textStack.setCustomSpacing(Theme.Spacing.small, after: titleContainer)
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(imageTile)
+        contentView.addSubview(textStack)
+
+        let bottom = textStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.xSmall)
+        bottom.priority = .defaultHigh // lets the estimated height be replaced cleanly when the cell self-sizes
+
+        let imageInset = Theme.Spacing.medium
         NSLayoutConstraint.activate([
+            imageTile.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageTile.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageTile.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageTile.heightAnchor.constraint(equalTo: imageTile.widthAnchor),
+
+            imageView.topAnchor.constraint(equalTo: imageTile.topAnchor, constant: imageInset),
+            imageView.leadingAnchor.constraint(equalTo: imageTile.leadingAnchor, constant: imageInset),
+            imageView.trailingAnchor.constraint(equalTo: imageTile.trailingAnchor, constant: -imageInset),
+            imageView.bottomAnchor.constraint(equalTo: imageTile.bottomAnchor, constant: -imageInset),
+
             titleLabel.topAnchor.constraint(equalTo: titleContainer.topAnchor),
             titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
             titleLabel.trailingAnchor.constraint(equalTo: titleContainer.trailingAnchor),
             titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: titleContainer.bottomAnchor),
+            titleContainer.widthAnchor.constraint(equalTo: textStack.widthAnchor),
+            titleHeight,
+
+            textStack.topAnchor.constraint(equalTo: imageTile.bottomAnchor, constant: Theme.Spacing.medium - 2),
+            textStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
+            textStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            bottom,
         ])
+    }
 
-        let textStack = UIStackView(arrangedSubviews: [titleContainer, priceLabel, ratingLabel])
-        textStack.axis = .vertical
-        textStack.spacing = Theme.Spacing.xSmall
-        textStack.translatesAutoresizingMaskIntoConstraints = false
-
-        contentView.addSubview(imageContainer)
-        contentView.addSubview(textStack)
-
-        let inset = Theme.Spacing.small
-        NSLayoutConstraint.activate([
-            imageContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: inset),
-            imageContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
-            imageContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
-            imageContainer.heightAnchor.constraint(equalTo: imageContainer.widthAnchor),
-
-            imageView.topAnchor.constraint(equalTo: imageContainer.topAnchor, constant: inset),
-            imageView.leadingAnchor.constraint(equalTo: imageContainer.leadingAnchor, constant: inset),
-            imageView.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor, constant: -inset),
-            imageView.bottomAnchor.constraint(equalTo: imageContainer.bottomAnchor, constant: -inset),
-
-            textStack.topAnchor.constraint(equalTo: imageContainer.bottomAnchor, constant: Theme.Spacing.small),
-            textStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
-            textStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
-            textStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -inset),
-            titleMinHeight,
-        ])
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        // Keep the two-line title box right after a Dynamic Type change, and refresh the
+        // CGColor border, which doesn't follow light/dark mode automatically.
+        titleHeight.constant = ceil(titleLabel.font.lineHeight * 2)
+        imageTile.layer.borderColor = Theme.Color.hairline.cgColor
     }
 }

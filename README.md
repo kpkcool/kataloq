@@ -4,7 +4,7 @@ A product catalogue proof of concept: a **native iOS app (Swift, UIKit, MVVM-C)*
 
 | Customers can… | Where |
 |---|---|
-| See 5 hand-picked featured products | Home (horizontal "Featured" row) |
+| See 5 hand-picked featured products, then all products | Home ("Featured" row, then an "All Products" grid) |
 | Browse a category: its 3 top-rated products, then all the others | Home → category chip |
 | Search by text (title, description, category) | Home → 🔍 |
 | See a product's details | Tap any product |
@@ -91,6 +91,7 @@ kataloq/
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/health` | `{"status":"ok"}` |
+| GET | `/api/v1/products` | all products (Home "All Products") |
 | GET | `/api/v1/products/featured` | 5 configured products |
 | GET | `/api/v1/categories` | categories |
 | GET | `/api/v1/categories/:categoryId/products` | `{category, topRated[3], additional[]}` |

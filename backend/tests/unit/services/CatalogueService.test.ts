@@ -67,6 +67,19 @@ describe('CatalogueService', () => {
     });
   });
 
+  describe('getAllProducts', () => {
+    it('returns every product in the data source order', async () => {
+      const { service } = setup();
+      expect(ids(await service.getAllProducts())).toEqual(ids(catalogue));
+    });
+
+    it('propagates upstream failures', async () => {
+      const { service, provider } = setup();
+      provider.failWith(new UpstreamUnavailableError());
+      await expect(service.getAllProducts()).rejects.toBeInstanceOf(UpstreamUnavailableError);
+    });
+  });
+
   describe('getCategories', () => {
     it('returns the provider categories', async () => {
       const { service } = setup();

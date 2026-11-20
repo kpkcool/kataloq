@@ -17,6 +17,15 @@ final class RemoteProductRepositoryTests: XCTestCase {
         XCTAssertEqual(products.map(\.id), ["5"])
     }
 
+    func testAllProductsCallsTheProductsEndpoint() async throws {
+        let (sut, client) = makeSUT(responseJSON: #"{"products":[\#(Fixtures.productJSON(id: "1", imageURL: nil)),\#(Fixtures.productJSON(id: "2", imageURL: nil))]}"#)
+
+        let products = try await sut.allProducts()
+
+        XCTAssertEqual(client.requestedEndpoints, [.get("/api/v1/products")])
+        XCTAssertEqual(products.map(\.id), ["1", "2"])
+    }
+
     func testCategoriesCallsCategoriesEndpoint() async throws {
         let (sut, client) = makeSUT(responseJSON: #"{"categories":[{"id":"electronics","name":"Electronics"}]}"#)
 
@@ -75,6 +84,9 @@ final class RemoteEnquiryRepositoryTests: XCTestCase {
         let endpoint = try XCTUnwrap(client.requestedEndpoints.first)
         XCTAssertEqual(endpoint.method, .post)
         XCTAssertEqual(endpoint.path, "/api/v1/enquiries")
-        XCTAssertEqual(endpoint.body, try JSONEncoder().encode(enquiry))
+        // Compare the JSON content, not raw bytes: JSONEncoder doesn't guarantee key order.
+        let body = try XCTUnwrap(endpoint.body)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
+        XCTAssertEqual(json, ["productId": "1", "name": "Jane", "email": "jane@example.com", "phone": "0400 000 000"])
     }
 }

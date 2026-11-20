@@ -52,6 +52,11 @@ export class CatalogueService {
     return featured;
   }
 
+  /** Every product, in the data source's original order (Home's "All Products" grid). */
+  getAllProducts(): Promise<Product[]> {
+    return this.products.listProducts();
+  }
+
   getCategories(): Promise<Category[]> {
     return this.products.listCategories();
   }

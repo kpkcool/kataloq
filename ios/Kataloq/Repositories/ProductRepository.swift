@@ -3,6 +3,7 @@ import Foundation
 /// Product data for the screens. ViewModels depend on this protocol, so they're tested with a mock.
 protocol ProductRepository: Sendable {
     func featuredProducts() async throws -> [Product]
+    func allProducts() async throws -> [Product]
     func categories() async throws -> [ProductCategory]
     func categoryProducts(categoryID: String) async throws -> CategoryProducts
     func searchProducts(matching query: String) async throws -> [Product]
@@ -19,6 +20,10 @@ final class RemoteProductRepository: ProductRepository {
 
     func featuredProducts() async throws -> [Product] {
         try await apiClient.send(.get("/api/v1/products/featured"), as: FeaturedProductsResponse.self).products
+    }
+
+    func allProducts() async throws -> [Product] {
+        try await apiClient.send(.get("/api/v1/products"), as: FeaturedProductsResponse.self).products
     }
 
     func categories() async throws -> [ProductCategory] {

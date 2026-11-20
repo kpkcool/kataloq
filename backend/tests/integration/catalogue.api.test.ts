@@ -79,6 +79,15 @@ describe('Catalogue API', () => {
     });
   });
 
+  describe('GET /api/v1/products', () => {
+    it('returns every product in data-source order', async () => {
+      const response = await request(setup().app).get('/api/v1/products');
+
+      expect(response.status).toBe(200);
+      expect(ids(response.body.products)).toEqual(['1', '5', '9', '10', '11', '12', '14']);
+    });
+  });
+
   describe('GET /api/v1/categories', () => {
     it('lists categories', async () => {
       const response = await request(setup().app).get('/api/v1/categories');
@@ -176,7 +185,7 @@ describe('Catalogue API', () => {
       const { app, provider } = setup();
       provider.failWith(error);
 
-      for (const path of ['/api/v1/products/featured', '/api/v1/categories', '/api/v1/products/search?q=a', '/api/v1/products/1']) {
+      for (const path of ['/api/v1/products', '/api/v1/products/featured', '/api/v1/categories', '/api/v1/products/search?q=a', '/api/v1/products/1']) {
         const response = await request(app).get(path);
         expect(response.status).toBe(status);
         expectErrorBody(response.body, code);

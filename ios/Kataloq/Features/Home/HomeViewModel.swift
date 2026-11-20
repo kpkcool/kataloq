@@ -2,10 +2,13 @@ import Foundation
 
 struct HomeContent: Equatable {
     let categories: [ProductCategory]
+    /// The 5 curated products (the assignment's "top rated" Home products), in configured order.
     let featured: [ProductCardViewData]
+    /// Every product, in the data source's order, shown below Featured.
+    let allProducts: [ProductCardViewData]
 }
 
-/// Home screen logic: loads the curated featured products and the category list.
+/// Home screen logic: loads the curated featured products, the category list and all products.
 /// No UIKit import: state and intents only, so it's fully unit-testable.
 @MainActor
 final class HomeViewModel {
@@ -31,25 +34,27 @@ final class HomeViewModel {
         self.locale = locale
     }
 
-    /// Loads featured products and categories in parallel. Either failing shows the error state
-    /// (both come from the same backend, so a partial screen would be misleading).
+    /// Loads featured products, categories and all products in parallel. Any failing shows the
+    /// error state (they come from the same backend, so a partial screen would be misleading).
     func load() async {
         state = .loading
         let repository = self.repository
         do {
             async let featuredRequest = repository.featuredProducts()
             async let categoriesRequest = repository.categories()
-            let (featured, categories) = try await (featuredRequest, categoriesRequest)
+            async let allProductsRequest = repository.allProducts()
+            let (featured, categories, allProducts) = try await (featuredRequest, categoriesRequest, allProductsRequest)
 
             // A newer load or the screen going away cancelled this one: leave the state alone.
             guard !Task.isCancelled else { return }
 
-            if featured.isEmpty && categories.isEmpty {
+            if featured.isEmpty && categories.isEmpty && allProducts.isEmpty {
                 state = .empty(message: "No products to show right now. Please check back soon.")
             } else {
                 state = .loaded(HomeContent(
                     categories: categories,
-                    featured: featured.uniquedByID().map { ProductCardViewData(product: $0, locale: locale) }
+                    featured: featured.uniquedByID().map { ProductCardViewData(product: $0, locale: locale) },
+                    allProducts: allProducts.uniquedByID().map { ProductCardViewData(product: $0, locale: locale) }
                 ))
             }
         } catch is CancellationError {

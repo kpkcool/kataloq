@@ -7,6 +7,7 @@ final class EnquiryViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let productLabel = UILabel()
     private let errorBanner = UILabel()
+    private let errorBannerView = UIView()
     private let submitButton = UIButton(configuration: .filled())
 
     private lazy var fields: [EnquiryField: FormFieldView] = [
@@ -93,10 +94,10 @@ final class EnquiryViewController: UIViewController {
 
         if case .failed(let message) = state {
             errorBanner.text = message
-            errorBanner.isHidden = false
+            errorBannerView.isHidden = false
             UIAccessibility.post(notification: .announcement, argument: message)
         } else {
-            errorBanner.isHidden = true
+            errorBannerView.isHidden = true
         }
     }
 
@@ -112,6 +113,34 @@ final class EnquiryViewController: UIViewController {
     }
 
     // MARK: - Layout
+
+    /// Red-tinted rounded box with a warning icon; hidden until a submission fails.
+    private func configureErrorBannerView() {
+        errorBannerView.backgroundColor = Theme.Color.error.withAlphaComponent(0.1)
+        errorBannerView.layer.cornerRadius = Theme.Radius.button
+        errorBannerView.layer.cornerCurve = .continuous
+        errorBannerView.isHidden = true
+
+        let icon = UIImageView(image: UIImage(systemName: "exclamationmark.triangle.fill"))
+        icon.tintColor = Theme.Color.error
+        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .subheadline)
+        icon.setContentHuggingPriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [icon, errorBanner])
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.small
+        row.alignment = .firstBaseline
+        row.translatesAutoresizingMaskIntoConstraints = false
+        errorBannerView.addSubview(row)
+
+        let padding = Theme.Spacing.medium
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: errorBannerView.topAnchor, constant: padding),
+            row.bottomAnchor.constraint(equalTo: errorBannerView.bottomAnchor, constant: -padding),
+            row.leadingAnchor.constraint(equalTo: errorBannerView.leadingAnchor, constant: padding),
+            row.trailingAnchor.constraint(equalTo: errorBannerView.trailingAnchor, constant: -padding),
+        ])
+    }
 
     private func setUpViews() {
         let introLabel = UILabel()
@@ -134,10 +163,10 @@ final class EnquiryViewController: UIViewController {
         infoLabel.adjustsFontForContentSizeCategory = true
 
         errorBanner.font = UIFont.preferredFont(forTextStyle: .subheadline)
-        errorBanner.textColor = Theme.Color.error
+        errorBanner.textColor = Theme.Color.primaryText
         errorBanner.numberOfLines = 0
         errorBanner.adjustsFontForContentSizeCategory = true
-        errorBanner.isHidden = true
+        configureErrorBannerView()
 
         var buttonConfiguration = UIButton.Configuration.filled()
         buttonConfiguration.title = viewModel.submitButtonTitle
@@ -153,10 +182,13 @@ final class EnquiryViewController: UIViewController {
         header.setCustomSpacing(Theme.Spacing.medium, after: productLabel)
 
         let fieldViews: [UIView] = fieldOrder.compactMap { field -> UIView? in fields[field] }
-        let stack = UIStackView(arrangedSubviews: [header] + fieldViews + [errorBanner, submitButton])
+        let stack = UIStackView(arrangedSubviews: [header] + fieldViews + [errorBannerView, submitButton])
         stack.axis = .vertical
-        stack.spacing = Theme.Spacing.large
+        stack.spacing = Theme.Spacing.large + 2
         stack.setCustomSpacing(Theme.Spacing.xLarge, after: header)
+        if let lastField = fieldViews.last {
+            stack.setCustomSpacing(Theme.Spacing.xLarge, after: lastField)
+        }
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false

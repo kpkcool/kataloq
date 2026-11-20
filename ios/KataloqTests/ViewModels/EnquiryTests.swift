@@ -196,10 +196,11 @@ final class EnquiryViewModelTests: XCTestCase {
         XCTAssertTrue(cancelled)
     }
 
-    func testThankYouMessageNamesTheProductAndReplyAddress() {
-        let content = ThankYouContent(productTitle: "Backpack", replyEmail: "jane@example.com", enquiryID: "e1")
-
-        XCTAssertEqual(content.message, "Your enquiry about \u{201C}Backpack\u{201D} has been sent. Our sales team will reply to jane@example.com.")
-        XCTAssertEqual(content.reference, "Reference: e1")
+    func testThankYouShortReferenceIsTheFirstBlockOfTheEnquiryID() {
+        let content = ThankYouContent(
+            productTitle: "Backpack", replyEmail: "jane@example.com", enquiryID: "ecaec87e-221f-415d-991a-dbf22b48317d"
+        )
+        XCTAssertEqual(content.shortReference, "ECAEC87E")
+        XCTAssertEqual(ThankYouContent(productTitle: "", replyEmail: "", enquiryID: "e1").shortReference, "E1")
     }
 }

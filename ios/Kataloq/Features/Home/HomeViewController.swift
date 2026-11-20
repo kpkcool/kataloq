@@ -1,23 +1,36 @@
 import UIKit
 
-/// Home: a horizontal row of category chips and a horizontally scrolling row of featured products.
+/// Home: category chips, a horizontally scrolling "Featured" row (the 5 curated products), then an
+/// "All Products" grid.
 /// Renders `HomeViewModel.state` and forwards taps; no networking or navigation here.
 final class HomeViewController: UIViewController {
     private enum Section: Hashable {
         case categories
         case featured
+        case allProducts
 
         var title: String {
             switch self {
             case .categories: return "Shop by category"
             case .featured: return "Featured"
+            case .allProducts: return "All Products"
             }
         }
     }
 
+    /// Featured products also appear in "All Products". Separate cases keep the two items distinct,
+    /// because a diffable data source can't hold the same item twice.
     private enum Item: Hashable {
         case category(ProductCategory)
+        case featured(ProductCardViewData)
         case product(ProductCardViewData)
+
+        var productID: String? {
+            switch self {
+            case .category: return nil
+            case .featured(let product), .product(let product): return product.id
+            }
+        }
     }
 
     private let viewModel: HomeViewModel
@@ -135,7 +148,11 @@ final class HomeViewController: UIViewController {
             }
             if !content.featured.isEmpty {
                 snapshot.appendSections([.featured])
-                snapshot.appendItems(content.featured.map(Item.product), toSection: .featured)
+                snapshot.appendItems(content.featured.map(Item.featured), toSection: .featured)
+            }
+            if !content.allProducts.isEmpty {
+                snapshot.appendSections([.allProducts])
+                snapshot.appendItems(content.allProducts.map(Item.product), toSection: .allProducts)
             }
         }
         dataSource.apply(snapshot, animatingDifferences: false)
@@ -163,7 +180,7 @@ final class HomeViewController: UIViewController {
             switch item {
             case .category(let category):
                 return collectionView.dequeueConfiguredReusableCell(using: categoryRegistration, for: indexPath, item: category)
-            case .product(let product):
+            case .featured(let product), .product(let product):
                 return collectionView.dequeueConfiguredReusableCell(using: productRegistration, for: indexPath, item: product)
             }
         }
@@ -179,6 +196,7 @@ final class HomeViewController: UIViewController {
             switch section {
             case .categories: return LayoutSections.chipRow()
             case .featured: return LayoutSections.productCarousel()
+            case .allProducts: return LayoutSections.productGrid()
             }
         }
     }
@@ -190,11 +208,10 @@ extension HomeViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
-        switch item {
-        case .category(let category):
+        if case .category(let category) = item {
             viewModel.selectCategory(category)
-        case .product(let product):
-            viewModel.selectProduct(id: product.id)
+        } else if let productID = item.productID {
+            viewModel.selectProduct(id: productID)
         }
     }
 }

@@ -41,6 +41,11 @@ final class ProductFormattingTests: XCTestCase {
         XCTAssertEqual(ProductFormatting.rating(Rating(average: 4, count: 1), locale: locale), "★ 4.0 (1)")
     }
 
+    func testRatingValueOmitsTheStarForIconLayouts() {
+        XCTAssertEqual(ProductFormatting.ratingValue(Rating(average: 4.6, count: 400), locale: locale), "4.6 (400)")
+        XCTAssertEqual(ProductFormatting.ratingValue(Rating(average: 0, count: 0), locale: locale), "No ratings yet")
+    }
+
     func testUnratedProductSaysSo() {
         XCTAssertEqual(ProductFormatting.rating(Rating(average: 0, count: 0), locale: locale), "No ratings yet")
     }

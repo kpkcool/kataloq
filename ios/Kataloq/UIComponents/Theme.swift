@@ -9,10 +9,11 @@ enum Theme {
         static let medium: CGFloat = 12
         static let large: CGFloat = 16
         static let xLarge: CGFloat = 24
+        static let xxLarge: CGFloat = 32
     }
 
     enum Radius {
-        static let card: CGFloat = 12
+        static let card: CGFloat = 14
         static let chip: CGFloat = 18
         static let button: CGFloat = 12
     }
@@ -23,6 +24,8 @@ enum Theme {
         static var cardBackground: UIColor { .secondarySystemBackground }
         static var chipBackground: UIColor { .tertiarySystemFill }
         static var imageBackground: UIColor { .white }
+        static var hairline: UIColor { .systemGray5 }
+        static var success: UIColor { .systemGreen }
         static var placeholderTint: UIColor { .tertiaryLabel }
         static var primaryText: UIColor { .label }
         static var secondaryText: UIColor { .secondaryLabel }

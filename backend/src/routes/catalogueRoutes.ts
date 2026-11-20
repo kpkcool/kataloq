@@ -8,6 +8,7 @@ export function catalogueRoutes(catalogue: CatalogueService): Router {
   const router = express.Router();
 
   // Literal paths before /products/:productId so "featured" and "search" are never read as IDs.
+  router.get('/products', controller.allProducts);
   router.get('/products/featured', controller.featured);
   router.get('/products/search', controller.search);
   router.get('/products/:productId', controller.product);

@@ -19,7 +19,7 @@ enum LayoutSections {
 
         let section = NSCollectionLayoutSection(group: group)
         section.orthogonalScrollingBehavior = .continuousGroupLeadingBoundary
-        section.interGroupSpacing = Theme.Spacing.medium
+        section.interGroupSpacing = Theme.Spacing.large
         section.contentInsets = sectionInsets(horizontal: Theme.Spacing.large)
         section.boundarySupplementaryItems = [header()]
         return section
@@ -29,7 +29,7 @@ enum LayoutSections {
     /// Each item is exactly half the width; spacing comes from item insets, so nothing can overflow.
     static func productGrid() -> NSCollectionLayoutSection {
         let height = NSCollectionLayoutDimension.estimated(estimatedCardHeight)
-        let halfSpacing = Theme.Spacing.medium / 2
+        let halfSpacing = Theme.Spacing.large / 2
 
         let item = NSCollectionLayoutItem(
             layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.5), heightDimension: height)
@@ -42,7 +42,7 @@ enum LayoutSections {
         )
 
         let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = Theme.Spacing.medium
+        section.interGroupSpacing = Theme.Spacing.xLarge
         section.contentInsets = sectionInsets(horizontal: Theme.Spacing.large - halfSpacing)
         section.boundarySupplementaryItems = [header(horizontalInset: halfSpacing)]
         return section
@@ -73,6 +73,6 @@ enum LayoutSections {
     }
 
     private static func sectionInsets(horizontal: CGFloat) -> NSDirectionalEdgeInsets {
-        NSDirectionalEdgeInsets(top: Theme.Spacing.small, leading: horizontal, bottom: Theme.Spacing.xLarge, trailing: horizontal)
+        NSDirectionalEdgeInsets(top: Theme.Spacing.small, leading: horizontal, bottom: Theme.Spacing.xxLarge, trailing: horizontal)
     }
 }

@@ -30,6 +30,10 @@ export function createCatalogueController(catalogue: CatalogueService) {
     res.json({ products: await catalogue.getFeaturedProducts() });
   };
 
+  const allProducts: RequestHandler = async (_req, res) => {
+    res.json({ products: await catalogue.getAllProducts() });
+  };
+
   const categories: RequestHandler = async (_req, res) => {
     res.json({ categories: await catalogue.getCategories() });
   };
@@ -49,5 +53,5 @@ export function createCatalogueController(catalogue: CatalogueService) {
     res.json({ product: await catalogue.getProduct(productId) });
   };
 
-  return { featured, categories, categoryProducts, search, product };
+  return { featured, allProducts, categories, categoryProducts, search, product };
 }

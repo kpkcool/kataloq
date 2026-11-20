@@ -3,6 +3,7 @@ import Foundation
 // Response envelopes of kataloq-api (docs/ARCHITECTURE.md §4). Property names match the
 // JSON keys exactly (camelCase), so no CodingKeys or key strategies are needed.
 
+/// `{ "products": [...] }`: used by both the featured and the all-products endpoints.
 struct FeaturedProductsResponse: Decodable {
     let products: [Product]
 }
