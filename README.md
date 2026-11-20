@@ -6,7 +6,7 @@ A product catalogue proof of concept: a **native iOS app (Swift, UIKit, MVVM-C)*
 |---|---|
 | See 5 hand-picked featured products, then all products | Home ("Featured" row, then an "All Products" grid) |
 | Browse a category: its 3 top-rated products, then all the others | Home → category chip |
-| Search by text (title, description, category) | Home → 🔍 |
+| Search by text (title, description, category) | Home → search bar (results update as you type, or tap Search on the keyboard) |
 | See a product's details | Tap any product |
 | Send an enquiry and get a thank-you confirmation | Product → "Enquire about this product" |
 
@@ -61,6 +61,12 @@ Ports already in use? `KATALOQ_API_PORT=3100 MAILPIT_UI_PORT=8125 docker compose
 | iOS | Swift, UIKit (programmatic, compositional layout + diffable data sources), MVVM-C, URLSession + async/await, Codable, XCTest. iOS 16+, iPhone. No third-party dependencies. |
 | Backend | Node.js 26 LTS, TypeScript 7 (strict), Express 5, zod 4, nodemailer, express-rate-limit; vitest + supertest |
 | Local infrastructure | Docker Compose: `kataloq-api` + Mailpit. The backend image runs unchanged on AWS (ECS / App Runner). |
+
+**Why this combination**
+- **Client: iOS app in Swift (UIKit).** Native iOS is my strongest platform, so I can own and defend every line. UIKit with MVVM-C keeps logic in testable ViewModels and navigation in one coordinator, so screens can be restyled when the creative work lands without touching business logic.
+- **Backend: Node.js with TypeScript.** Strict TypeScript catches API-contract mistakes at compile time, and Node is the quickest path in the brief to a tested REST API that runs anywhere on AWS. The backend owns all product data (the app never calls Fake Store) and hides the data source and email provider behind interfaces, so both can be replaced.
+
+More detail and the trade-offs: [`DECISIONS.md`](DECISIONS.md) §1.
 
 ## Repository structure
 
