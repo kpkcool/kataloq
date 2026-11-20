@@ -22,11 +22,11 @@ An entrepreneur needs an interactive proof of concept of a product catalogue tha
 
 | Acceptance criterion | Implementation |
 |---|---|
-| Home shows the 5 chosen products | `FEATURED_PRODUCT_IDS` (exactly 5, validated at startup) → `GET /api/v1/products/featured`. Shown as a horizontal "Featured" carousel, with category chips above. |
+| Home shows the 5 chosen products | `FEATURED_PRODUCT_IDS` (exactly 5, validated at startup) → `GET /api/v1/products/featured`. Shown as a horizontal "Featured" carousel, with a search bar and category chips above and an "All Products" grid (`GET /api/v1/products`) below. |
 | Category: top rated, then additional | `GET /api/v1/categories/:id/products`. The backend ranks by rating score, then rating count (ties keep Fake Store's order). The first 3 are "Top Rated" (carousel); the rest are "All Products" (grid), with no duplicates. |
-| Search shows only matches | Search runs on the keyboard's Search button → `GET /api/v1/products/search?q=`. Case-insensitive substring match on title, description and category; Fake Store order kept. Blank or over-long terms are never sent. |
+| Search shows only matches | Search bar on Home; results appear over Home as the user types (300 ms pause, older requests cancelled) and immediately on the keyboard's Search button → `GET /api/v1/products/search?q=`. Case-insensitive substring match on title, description and category; Fake Store order kept. Blank or over-long terms are never sent. |
 | Product page | Tapping any tile → detail screen with image, category, title, price, rating, description, and a sticky Enquire button. |
-| Enquiry → email → thank you | Modal form: name and email required, phone and message optional, validated on the client and on the backend (authoritative). `POST /api/v1/enquiries` sends SMTP to Mailpit and returns `202` **only after the email is accepted**. The form is then replaced by "Thank you". A failure shows an error, keeps the input and allows retry. |
+| Enquiry → email → thank you | Modal form (required fields marked with a red `*`): name and email required, phone and message optional, validated on the client and on the backend (authoritative). `POST /api/v1/enquiries` sends SMTP to Mailpit and returns `202` **only after the email is accepted**. The form is then replaced by "Thank you". A failure shows an error, keeps the input and allows retry. |
 
 Every screen has loading, empty and error-with-retry states. Text uses Dynamic Type, and the main elements have VoiceOver labels.
 
@@ -48,14 +48,14 @@ See `DECISIONS.md`. In short:
 
 ### Testing performed
 
-*Fill in from the latest `./scripts/verify.sh` run. Copy the real numbers only.*
+Full run of `./scripts/verify.sh` on 2026-11-20 12:35 IST (Xcode 27.2, iPhone 18 Pro Simulator, Docker 29.9.3, Node 26), all **PASS**:
 
-- Backend: `npm run typecheck` … ; `npm test` … tests passed; `npm run build` …
-- iOS: `xcodebuild test` … `Executed N tests, with 0 failures`
-- End-to-end (Compose + live Fake Store + Mailpit): AC1–AC5 …; email-provider outage → 502 …
-- Manual Simulator walkthrough: `docs/TESTING.md` M1–M13 …
+- **Backend:** `npm run typecheck` clean; `npm test` **204/204** (unit + integration); `npm run build` OK.
+- **iOS:** `xcodebuild test` **123 tests, 0 failures**.
+- **End to end** (Compose + live Fake Store + Mailpit): AC1 featured 1, 5, 9, 14, 18; AC2 electronics top 12, 11, 9 then 10, 13, 14; AC3 `JACKET` → 3, 15, 16, 17, no match → empty, blank → 400; AC4 product details, unknown → 404; AC5 enquiry 202 with the email captured in Mailpit; mail server down → 502, never 202.
+- **Manual in the Simulator:** Home, Category, enquiry success and failure, email in Mailpit, Thank you (see `docs/TESTING.md`; remaining manual checks are listed there).
 
-Results already observed during development (backend increments 1–3: 71 / 107 / 137 tests passing; live API and enquiry/outage checks) are recorded with timestamps in `docs/TESTING.md`.
+Testing found and fixed: a Docker file-permission bug, a data race in the iOS test mocks, and a carousel that changed height while scrolling (details in `AI_USAGE.md`).
 
 ### Known limitations
 
@@ -64,6 +64,7 @@ Results already observed during development (backend increments 1–3: 71 / 107 
 - **In memory, per instance:** the rate limit and the cache.
 - **Search:** no relevance ranking or pagination.
 - **App scope:** iPhone portrait only, and no UI or snapshot tests for screens.
+- **iOS tests run serially** (`-parallel-testing-enabled NO`); parallel Simulator clones were unreliable on the test machine and the suite takes under a second anyway.
 - **Prices:** shown in USD.
 
 Code review findings and their status: `docs/CODE_REVIEW.md`. How AI was used: `AI_USAGE.md`.
@@ -85,4 +86,4 @@ Code review findings and their status: `docs/CODE_REVIEW.md`. How AI was used: `
 > - `AGENTS.md`: the agent instructions used.
 > - `docs/`: requirements, architecture, testing and code review.
 >
-> **Time spent:** *[fill in from DECISIONS.md §10]*.
+> **Time spent:** about 7 hours of wall-clock time over two days (breakdown in `DECISIONS.md` §10), over the 2–3 hour guide mainly because of step-by-step verification and UI polish after Simulator review.

@@ -36,27 +36,57 @@ It prints a summary table: paste it into "Latest full run" below.
 | 2026-11-20 07:23 | App: enquiry with Mailpit running | **PASS (M6, M7)**: Thank you screen (product + reply email + reference); Mailpit received "New enquiry: Fjallraven - Foldsack No. 1 Backpack…" to `sales@kataloq.local`, Reply-To the customer, product and customer details, "(not provided)" for phone/message | Screenshots of app and Mailpit |
 | 2026-11-20 07:25 | App: Electronics category | **PASS (M2 / AC2 in app)**: Top Rated 12 (4.8/400), 11 (4.8/319), 9; All Products 10 (2.9/470), 13 (2.9/250), 14 (2.2/140); no repeats | Screenshots |
 | 2026-11-20 07:25 | App: Home (carousel version) | **PASS (M1)**: chips with icons, Featured carousel 1, 5, … | Screenshot. Visual issues found: gap between title and price on cards; stretched check icon on Thank you; empty space below Featured. Fixed in the next change. |
+| 2026-11-20 08:12–08:20 | App: Home after the product card design system | **PASS (M1 / AC1 in app)**: Featured 1, 5, 9… as white bordered cards with soft shadow, square aspect-fit images, two-line titles, aligned prices and ratings; All Products grid. Found: search bar rendered at the **bottom** (iOS 26 toolbar placement) and the gap above All Products **changed while scrolling** Featured. Both fixed (pinned search bar; card height estimate computed from tokens). | Screenshots |
+| 2026-11-20 08:23–08:27 | App: Enquiry sheet | Layout checked: close button moved to the right, Send button pinned at the bottom, Message box fills spare height, red `*` on required / grey "(optional)" | Screenshots |
+| 2026-11-20 08:37 | `docker compose up --build` | **FAIL**: `kataloq-api` restart loop, `Cannot read package config /app/package.json: permission denied`. Files on the Mac were mode 600 and the image runs as user `node`. Fixed: Dockerfile copies runtime files `--chown=node:node`. | Compose log |
+| 2026-11-20 08:39 | App: enquiry against the API **in Docker** | **PASS (M6)**: API log `POST /api/v1/enquiries 202` from `kataloq-api-1`; Thank you screen with product, reply email and reference `AE413833` | Screenshot + container log |
+| 2026-11-20 12:26 | iOS XCTest (parallel, Xcode default) | `TEST FAILED` with 0 failing tests: only 74 of 123 ran (a parallel Simulator clone stopped) | Terminal output |
+| 2026-11-20 12:29 | iOS XCTest, `-parallel-testing-enabled NO` | **PASS: 123/123** | Terminal output |
+| 2026-11-20 12:31 | `./scripts/verify.sh` (app also running from Xcode on the same Simulator) | iOS **FAIL**: 75 of 123, `HomeViewModelTests.testBackendNotRunningShowsConnectionMessage` and `testNothingToShowIsEmptyState` **crashed**. Cause: test bug, a data race in `MockProductRepository` (Home calls three repository methods concurrently with `async let`; the mock appended to an unguarded array). Fixed with a lock in the mocks. | `/tmp/kataloq-xcodebuild.log` |
+| 2026-11-20 12:35 | `./scripts/verify.sh` | **ALL PASS**, see below | Script summary |
 
 **Not yet observed** (no output seen in the session):
-- Backend test run including increments 4–5 and the Phase 6 fix (enquiry, SMTP, rate limiting, logger, health log level).
-- `docker compose up --build` (both services healthy) and the email visible in the Mailpit UI through Compose.
-- `docker compose up --build` succeeding, and the E2E section of `verify.sh`.
-- iOS XCTest at 100% after the test fix and the UI changes of 2026-11-20 (Home "All Products", card redesign, Thank you redesign).
-- Search and Product detail in the Simulator (M3, M10), backend-down (M11), accessibility (M13).
+- Search as you type in the Simulator (M10).
+- Product detail screen checked on its own (M3); it was reached on the way to Enquire.
+- Backend-down state in the app (M11), larger text and VoiceOver (M13), small iPhone vs Pro Max.
 
 ## Latest full run (`scripts/verify.sh`)
 
-*Pending: paste the summary table here.*
+Run on 2026-11-20 at 12:35 IST, developer's Mac (Xcode 27.2, iPhone 18 Pro Simulator, Docker 29.9.3, Node 26):
+
+```
+backend typecheck                                PASS
+backend tests (vitest)                           PASS  Tests  204 passed (204)
+backend build                                    PASS
+docker compose up --build                        PASS
+GET /health                                      PASS
+compose service health                           INFO  kataloq-api=starting mailpit=healthy
+AC1 featured = 5 configured products             PASS  1:mens-clothing 5:jewelery 9:electronics 14:electronics 18:womens-clothing
+categories                                       PASS  electronics jewelery mens-clothing womens-clothing
+AC2 category: top 3 by rating, rest, no dupes    PASS  top=12,11,9 rest=10,13,14
+AC3 search 'JACKET' only matching, case-insens.  PASS  3,15,16,17
+search with no matches -> empty list             PASS
+blank search -> 400                              PASS
+AC4 product details                              PASS  Fjallraven - Foldsack No. 1 Backpack, Fits 15 Laptops | 109.95 | Men's Clothing | 3.9
+unknown product -> 404                           PASS
+invalid enquiry -> 400                           PASS
+AC5 enquiry accepted (202)                       PASS  {"enquiryId":"e57e9181-…","status":"sent"}
+AC5 email captured in Mailpit                    PASS  1 email(s): New enquiry: John Hardy Women's Legends Naga … -> sales@kataloq.local
+email provider down -> 502, never 202            PASS
+iOS XCTest                                       PASS  Executed 123 tests, with 0 failures (0 unexpected) in 0.334 (0.377) seconds
+```
+
+"compose service health: starting" is the Docker health check's first interval; `GET /health` had already answered.
 
 ## Acceptance criteria (assignment)
 
 | # | Requirement | Expected behaviour | Actual result | Status |
 |---|---|---|---|---|
-| AC1 | Home: 5 chosen top-rated products | Exactly the 5 configured products, in order, each with image, title, price, rating | API: 1, 5, 9, 14, 18 returned (18:12). App: Home showed them (22:24, before carousel redesign) | API **PASS**; app *Pending re-check after redesign* |
+| AC1 | Home: 5 chosen top-rated products | Exactly the 5 configured products, in order, each with image, title, price, rating | API: 1, 5, 9, 14, 18 (verify.sh, 20 Nov 12:35). App: Featured carousel 1, 5, 9… (20 Nov 08:20) | **PASS** |
 | AC2 | Category: top-rated products for that category, then additional products | Tap category → "Top Rated" (3, by rating then count) then "All Products" (rest), no duplicates, only that category | API (19 Nov 18:12) and app (20 Nov 07:25): electronics 12, 11, 9 / 10, 13, 14 | **PASS** |
-| AC3 | Search: only products matching the term | Search button → only matches (title, description, category; case-insensitive); empty → prompt; none → "No products match" | API: `jacket` returned matches (18:12) | API **PASS**; app *Pending* |
-| AC4 | Product page | Tapping any tile shows image, name, description, price, category, rating, Enquire | – | *Pending* |
-| AC5 | Enquiry → email to sales inbox → thank you | Valid form → 202 → email in Mailpit → "Thank you" screen; failure → error, data kept, retry | API: 202 + 502-on-outage (19 Nov 18:25). App: failure path and success path, email in Mailpit (20 Nov 07:20–07:23) | **PASS** |
+| AC3 | Search: only products matching the term | Search on Home: typing (after a 300 ms pause) or the keyboard Search button → only matches (title, description, category; case-insensitive); empty → back to Home; none → "No products match" | API: `JACKET` → 3, 15, 16, 17; no match → empty; blank → 400 (verify.sh, 20 Nov 12:35). iOS: `SearchViewModelTests` (typing, fast typing sends only the last term, clearing) | API + unit **PASS**; app *Pending (M10)* |
+| AC4 | Product page | Tapping any tile shows image, name, description, price, category, rating, Enquire | API: product 1 with title, price, category, rating; unknown → 404 (verify.sh, 20 Nov 12:35). App: detail → Enquire reached (20 Nov 08:23) | API **PASS**; app screen *Pending visual check (M3)* |
+| AC5 | Enquiry → email to sales inbox → thank you | Valid form → 202 → email in Mailpit → "Thank you" screen; failure → error, data kept, retry | API: 202, email in Mailpit, 502 on outage (verify.sh, 20 Nov 12:35). App: failure and success paths, email in Mailpit (07:20–07:23); success against the Docker API (08:39) | **PASS** |
 
 ## Manual iOS end-to-end checklist
 
@@ -64,16 +94,16 @@ Run with `docker compose up -d` and the app on a Simulator (⌘R). Record PASS/F
 
 | # | Step | Expected | Result |
 |---|---|---|---|
-| M1 | Launch app | Home: category chips with icons; "Featured" horizontal row of 5 cards that snaps | *Pending* |
-| M2 | Tap "Electronics" | "Top Rated" row (3) then "All Products" grid (3), no repeats | *Pending* |
+| M1 | Launch app | Home: search bar under the title, category chips with icons, "Featured" row of 5 cards, "All Products" grid | **PASS** (20 Nov 08:20) |
+| M2 | Tap "Electronics" | "Top Rated" row (3) then "All Products" grid (3), no repeats | **PASS** (20 Nov 07:25, before the card redesign) |
 | M3 | Tap a product | Detail: image, category, title, price, rating, description, sticky "Enquire about this product" | *Pending* |
 | M4 | Tap Enquire, tap "Send enquiry" with empty form | Inline errors on Name and Email; nothing sent | *Pending* |
 | M5 | Enter `J` / `nope` as name/email, send | Inline length/format errors | *Pending* |
-| M6 | Valid name + email (phone/message optional), send | Button shows "Sending…", then "Thank you!" screen naming the product and email | *Pending* |
-| M7 | Open http://localhost:8025 | One new email to `sales@kataloq.local` with product and customer details | *Pending* |
-| M8 | `docker compose stop mailpit`, send another enquiry | Red error "We could not send your enquiry right now…", form keeps input, no Thank you | *Pending* |
-| M9 | `docker compose start mailpit`, tap "Send enquiry" again | Thank you screen | *Pending* |
-| M10 | Search `jacket`, then `SSD`, then `unicorn`, then spaces only | Matches / case-insensitive matches / "No products match" / prompt without a request | *Pending* |
+| M6 | Valid name + email (phone/message optional), send | Button shows "Sending…", then "Thank you!" screen naming the product and email | **PASS** (20 Nov 07:23 and 08:39) |
+| M7 | Open http://localhost:8025 | One new email to `sales@kataloq.local` with product and customer details | **PASS** (20 Nov 07:23) |
+| M8 | `docker compose stop mailpit`, send another enquiry | Red error "We could not send your enquiry right now…", form keeps input, no Thank you | **PASS** (20 Nov 07:20) |
+| M9 | `docker compose start mailpit`, tap "Send enquiry" again | Thank you screen | **PASS** (20 Nov 07:23) |
+| M10 | Type `jacket`, then `SSD`, then `unicorn` in the Home search bar, then clear it | Results update while typing / case-insensitive matches / "No products match" / back to Home without a request | *Pending* |
 | M11 | `docker compose stop kataloq-api`, pull to refresh on Home | "Can't reach Kataloq right now…" + "Try again"; start API → Try again works | *Pending* |
 | M12 | A product with no/failed image | Grey photo placeholder, no crash | *Pending* (covered by unit test for `imageUrl: null`) |
 | M13 | Settings → Accessibility → Larger Text, VoiceOver on Home | Text scales; tiles read "title, price, Rated x out of 5 from n reviews" | *Pending* |
@@ -82,3 +112,4 @@ Run with `docker compose up -d` and the app on a Simulator (⌘R). Record PASS/F
 
 - No UI/snapshot tests for ViewControllers (see `docs/CODE_REVIEW.md` R2).
 - No automated test drives the Simulator against the live backend; that path is the manual checklist above plus `verify.sh` §3 for the API.
+- iOS tests run serially (`-parallel-testing-enabled NO`). The suite takes about 0.3 s; parallel Simulator clones made `xcodebuild` report TEST FAILED without a failing test (20 Nov 12:26).

@@ -108,12 +108,12 @@ cd backend && npm test               # backend unit + integration (no network or
 cd backend && npm run typecheck
 # iOS: open ios/Kataloq.xcodeproj and press ⌘U, or:
 xcodebuild test -project ios/Kataloq.xcodeproj -scheme Kataloq \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -parallel-testing-enabled NO
 
 ./scripts/verify.sh                  # everything + end-to-end smoke test against Compose
 ```
 
-All unit tests use fakes (no backend, network or Mailpit needed). What's covered and the recorded results: [`docs/TESTING.md`](docs/TESTING.md).
+All unit tests use fakes (no backend, network or Mailpit needed). The iOS suite runs serially (`-parallel-testing-enabled NO`): it finishes in under a second, and parallel Simulator clones occasionally fail to start, which makes `xcodebuild` report TEST FAILED without any failing test. What's covered and the recorded results: [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Known limitations
 

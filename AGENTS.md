@@ -60,7 +60,7 @@ docs/               REQUIREMENTS, ARCHITECTURE, TESTING, CODE_REVIEW, SUBMISSION
 - Test both success and failure paths. For enquiries, always assert that a provider failure is **never** reported as success.
 - Before saying anything passes, **run it**:
   - `cd backend && npm run typecheck && npm test && npm run build`
-  - `xcodebuild test -project ios/Kataloq.xcodeproj -scheme Kataloq -destination 'platform=iOS Simulator,name=<device>'`
+  - `xcodebuild test -project ios/Kataloq.xcodeproj -scheme Kataloq -destination 'platform=iOS Simulator,name=<device>' -parallel-testing-enabled NO` (the suite runs in well under a second; parallel Simulator clones only add a way to fail)
   - `./scripts/verify.sh` for the full run including the end-to-end smoke test.
 
 ## Prohibited shortcuts

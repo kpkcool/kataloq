@@ -90,7 +90,8 @@ docker compose start mailpit >/dev/null 2>&1
 
 echo "== 4. iOS: build and run XCTest on '$SIMULATOR'"
 xcodebuild test -project ios/Kataloq.xcodeproj -scheme Kataloq \
-  -destination "platform=iOS Simulator,name=$SIMULATOR" >/tmp/kataloq-xcodebuild.log 2>&1; XCODE=$?
+  -destination "platform=iOS Simulator,name=$SIMULATOR" -parallel-testing-enabled NO \
+  >/tmp/kataloq-xcodebuild.log 2>&1; XCODE=$?
 XCSUM=$(grep -E "Executed [0-9]+ tests" /tmp/kataloq-xcodebuild.log | tail -1 | sed 's/^ *//')
 if [[ $XCODE -eq 0 ]]; then record "iOS XCTest" PASS "$XCSUM"; else record "iOS XCTest" FAIL "${XCSUM:-build failed, see /tmp/kataloq-xcodebuild.log}"; fi
 grep -E "error:|Test Case .* failed" /tmp/kataloq-xcodebuild.log | head -20

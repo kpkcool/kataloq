@@ -158,11 +158,11 @@ Single **`AppCoordinator`** owning a `UINavigationController`. A second coordina
 |---|---|---|
 | Home | product tile | push `ProductDetail(id)` |
 | Home | category chip | push `Category(category)` |
-| Home | search button (nav bar) | push `Search` |
-| Category / Search | product tile | push `ProductDetail(id)` |
+| Home | search bar (typing / Search key) | no navigation: results appear over Home (`SearchViewController` is the `UISearchController`'s results controller) |
+| Category / Search results | product tile | push `ProductDetail(id)` |
 | ProductDetail | Enquire | present `Enquiry(product)` modally in its own `UINavigationController` |
 | Enquiry | submit succeeded | replace form with `ThankYouViewController` in the modal stack (no back to the submitted form) |
-| ThankYou / Enquiry | Done / Cancel | dismiss modal |
+| ThankYou / Enquiry | Continue shopping / Close (✕) | dismiss modal |
 
 ViewModels expose intents as closures; the coordinator assigns them with `[weak self]`. VMs never see `UIViewController`.
 Retention: `SceneDelegate` → `AppCoordinator` → `UINavigationController` → VCs → VMs. Closures from VMs back to the coordinator are weak → no cycles.
@@ -171,9 +171,9 @@ Retention: `SceneDelegate` → `AppCoordinator` → `UINavigationController` →
 
 | Screen | Layout | States |
 |---|---|---|
-| Home | `UICollectionView` + compositional layout + diffable data source: categories (horizontal chips) section, featured (2-column grid) section; search button in nav bar | loading, loaded, failed+retry. Categories and featured load concurrently (`async let`); one failing shows error for that part only |
+| Home | `UICollectionView` + compositional layout + diffable data source: search bar pinned under the large title; categories (horizontal chips), Featured (horizontal carousel of product cards) and All Products (2-column grid) sections | loading, loaded, empty, failed+retry. Categories, featured and all products load concurrently (`async let`) |
 | Category | Same tile grid, two sections with headers **"Top Rated"** (`topRated`) and **"All Products"** (`additional`), in the order the backend returns them; an empty section is hidden. The app does no sorting or de-duplication of its own (backend owns the rule). | loading, loaded, empty (category has no products), failed+retry, not-found |
-| Search | `UISearchController` in nav bar; search runs on keyboard **Search** button (`searchBarSearchButtonClicked`) — the "search button" in the AC. Results shown in the order returned (Fake Store order, D9). | idle prompt, loading, results, empty ("No products match 'x'"), failed+retry; empty term → inline prompt, no request |
+| Search results (on Home) | Results controller of Home's `UISearchController`, 2-column grid. Searches as the user types (300 ms pause, each keystroke cancels the previous search) and immediately on the keyboard **Search** button, the "search button" in the AC. Matching stays on the backend; results in the order returned (Fake Store order, D9). | loading, results, empty ("No products match 'x'"), failed+retry; empty field → back to Home, no request |
 | Product detail | `UIScrollView` + `UIStackView`: image, title, price, category, rating, description, sticky **Enquire** button | loading, loaded, not-found, failed+retry |
 | Enquiry | Scroll view with `FormFieldView`s (name, email, phone, message), inline errors, Submit with spinner, keyboard avoidance | editing, submitting (button disabled → no double submit), failed (data kept, retry), succeeded → Thank you |
 | Thank you | Message + product name + Done | static |

@@ -5,20 +5,42 @@ enum MockError: Error, Equatable {
     case notStubbed
 }
 
+/// A value guarded by a lock. Mocks record calls through it because ViewModels call
+/// repositories concurrently (Home loads featured, categories and all products with
+/// `async let`), so appends can arrive from several threads at once. An unguarded array
+/// append from two threads can crash the test process.
+final class Locked<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+
+    func withLock<T>(_ body: (inout Value) -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
+    }
+}
+
 /// Records endpoints and decodes a canned JSON body, so repository tests also exercise decoding.
-/// `@unchecked Sendable`: only touched from one test at a time.
+/// `@unchecked Sendable`: stubs are set by the test before the call; the record is lock-guarded.
 final class MockAPIClient: APIClient, @unchecked Sendable {
-    private(set) var requestedEndpoints: [Endpoint] = []
+    private let endpointLog = Locked<[Endpoint]>([])
+    var requestedEndpoints: [Endpoint] { endpointLog.withLock { $0 } }
     var responseJSON = "{}"
     var error: Error?
 
     func send<Response: Decodable>(_ endpoint: Endpoint, as responseType: Response.Type) async throws -> Response {
-        requestedEndpoints.append(endpoint)
+        endpointLog.withLock { $0.append(endpoint) }
         if let error { throw error }
         return try JSONDecoder().decode(Response.self, from: Data(responseJSON.utf8))
     }
 }
 
+/// `@unchecked Sendable`: results are set by the test between loads; the call log is lock-guarded
+/// because a ViewModel may call several methods concurrently.
 final class MockProductRepository: ProductRepository, @unchecked Sendable {
     var featuredResult: Result<[Product], Error> = .success([])
     var allProductsResult: Result<[Product], Error> = .success([])
@@ -27,45 +49,51 @@ final class MockProductRepository: ProductRepository, @unchecked Sendable {
     var searchResult: Result<[Product], Error> = .success([])
     var productResult: Result<Product, Error> = .failure(MockError.notStubbed)
 
-    private(set) var calls: [String] = []
+    private let callLog = Locked<[String]>([])
+    var calls: [String] { callLog.withLock { $0 } }
+
+    private func record(_ call: String) {
+        callLog.withLock { $0.append(call) }
+    }
 
     func featuredProducts() async throws -> [Product] {
-        calls.append("featuredProducts")
+        record("featuredProducts")
         return try featuredResult.get()
     }
 
     func allProducts() async throws -> [Product] {
-        calls.append("allProducts")
+        record("allProducts")
         return try allProductsResult.get()
     }
 
     func categories() async throws -> [ProductCategory] {
-        calls.append("categories")
+        record("categories")
         return try categoriesResult.get()
     }
 
     func categoryProducts(categoryID: String) async throws -> CategoryProducts {
-        calls.append("categoryProducts:\(categoryID)")
+        record("categoryProducts:\(categoryID)")
         return try categoryProductsResult.get()
     }
 
     func searchProducts(matching query: String) async throws -> [Product] {
-        calls.append("searchProducts:\(query)")
+        record("searchProducts:\(query)")
         return try searchResult.get()
     }
 
     func product(id: String) async throws -> Product {
-        calls.append("product:\(id)")
+        record("product:\(id)")
         return try productResult.get()
     }
 }
 
 final class MockEnquiryRepository: EnquiryRepository, @unchecked Sendable {
     var result: Result<EnquiryConfirmation, Error> = .success(EnquiryConfirmation(enquiryId: "e1", status: "sent"))
-    private(set) var submitted: [EnquiryRequest] = []
+    private let submissionLog = Locked<[EnquiryRequest]>([])
+    var submitted: [EnquiryRequest] { submissionLog.withLock { $0 } }
 
     func submit(_ enquiry: EnquiryRequest) async throws -> EnquiryConfirmation {
-        submitted.append(enquiry)
+        submissionLog.withLock { $0.append(enquiry) }
         return try result.get()
     }
 }

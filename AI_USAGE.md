@@ -14,7 +14,7 @@
 
 - Claude's sandboxes had **no access to npm or Fake Store** and **no Swift compiler**. Claude could not install packages, run the backend, or build the iOS app.
 - To catch mistakes before handing code over, Claude **type-checked backend code with TypeScript 7 and dry-ran its tests with a minimal local stand-in for vitest**. These dry runs were always reported as dry runs, never as test results.
-- **Every result in [`docs/TESTING.md`](docs/TESTING.md) comes from output the engineer pasted from the Mac.** Where no output was seen (notably iOS XCTest runs), it says *Pending*.
+- **Every result in [`docs/TESTING.md`](docs/TESTING.md) comes from output the engineer pasted from the Mac.** Where no output was seen, it says *Pending*. The full `verify.sh` run on 2026-11-20 12:35 passed everything, including 123 iOS tests.
 
 ## How Claude was used
 
@@ -54,6 +54,10 @@
 | 4 | The first request-logging middleware logged `req.path`, which inside a mounted Express router can lose the `/api/v1` prefix. | Claude's own re-read before the code was first run | Path taken from `req.originalUrl` at request start, without the query string |
 | 5 | Claude said increment 3 added 34 integration tests; the run showed 30. | Comparing with the vitest output | Corrected in the next message |
 | 6 | The architecture assumed library majors (nodemailer 7, express-rate-limit 7); npm installed nodemailer 10 and express-rate-limit 8. | `package.json` after install | Code kept to stable APIs; nothing broke |
+| 7 | The backend Dockerfile copied `package.json` as root and ran the app as user `node`. On a machine where the files were mode 600 (as on the engineer's Mac), Node couldn't read `package.json` and the container restarted in a loop. | `docker compose up --build` on the Mac | Runtime files copied `--chown=node:node`; the app still doesn't run as root |
+| 8 | The iOS test mocks recorded calls in plain arrays, but Home calls three repository methods concurrently (`async let`). The unguarded appends were a data race that crashed two `HomeViewModelTests` intermittently. | `verify.sh` reported 75 of 123 tests and "Restarting after unexpected exit, crash, or test timeout" | Mocks record through a small lock-guarded `Locked<Value>` |
+| 9 | Product cards used a fixed 300 pt height estimate. In a horizontal carousel, off-screen cards keep the estimate, so the row started too tall and shrank while scrolling, moving the section below. | The engineer noticed the gap change in the Simulator | Estimate computed from the card's tokens and fonts, kept just under the real height; a test checks it against a laid-out card |
+| 10 | Home's search bar used `UINavigationItem.searchController` without setting placement. On iOS 26 it appeared at the bottom of the screen. | Engineer's screenshot | `preferredSearchBarPlacement = .stacked` and, on iOS 26, `searchBarPlacementAllowsToolbarIntegration = false` |
 
 Not counted as mistakes: proposals the engineer chose differently, such as the "top rated" definition, the tie-break rule, the "More in <Category>" label (became "All Products") and the fixture data source. They are recorded as decisions in `DECISIONS.md`.
 
@@ -72,6 +76,6 @@ Not counted as mistakes: proposals the engineer chose differently, such as the "
 
 ## What still needs a human
 
-- Run `./scripts/verify.sh` and the manual checklist in `docs/TESTING.md`, and fill in the *Pending* rows from real output.
+- Finish the remaining manual checks in `docs/TESTING.md` (search while typing, Product detail, backend down, accessibility) and record the results. `verify.sh` already passed in full (2026-11-20 12:35).
 - Adjust the time-spent table in `DECISIONS.md` to actual effort.
 - Open the pull request (`docs/SUBMISSION.md` has the description) and keep it open.

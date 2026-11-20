@@ -147,12 +147,14 @@
 
 ## 10. Time spent
 
-Wall-clock windows from the working session on 2026-11-19 (IST). They include time spent waiting for test runs on the Mac; **the engineer should adjust these to actual effort before submitting.**
+Wall-clock windows from the working sessions on 2026-11-19 and 2026-11-20 (IST). They include time spent waiting for test runs on the Mac and idle time between messages; **the engineer should adjust these to actual effort before submitting.**
 
 | Activity | Window | Approx. |
 |---|---|---|
 | Planning: requirements analysis, architecture, decisions | 16:17 – 17:00 | 45 min |
 | Building: backend (5 increments, tested after each) | 17:00 – 18:30 | 1 h 30 min |
 | Building: iOS app (5 screens) | 21:16 – 22:56 | 1 h 40 min |
-| Testing and reviewing: code review, fixes, verification script, docs | 22:56 – end | *to fill in* |
-| **Total** | | **≈ 4 h +** (over the 2–3 h guide; the full planning/review process and step-by-step verification were the main reasons) |
+| Testing and reviewing: code review, fixes, verification script, docs | 19 Nov 22:56 – 23:30 | 35 min |
+| UI polish from Simulator feedback (product card design system, search on Home, enquiry form) and test fixes | 20 Nov 06:45 – 08:45 | 2 h |
+| Final verification and documentation | 20 Nov 12:20 – 12:45 | 25 min |
+| **Total** | | **≈ 7 h wall clock** (well over the 2–3 h guide: the step-by-step approval process, the UI polish requested after seeing the app in the Simulator, and verifying every stage on a real Mac were the main reasons) |

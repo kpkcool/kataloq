@@ -15,9 +15,11 @@ RUN npm run build
 FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
-COPY package.json package-lock.json ./
+# Owned by the runtime user: Node reads package.json at start-up (to see "type": "module"),
+# and the image must not depend on the file permissions of whoever built it.
+COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-COPY --from=build /app/dist ./dist
+COPY --from=build --chown=node:node /app/dist ./dist
 
 # Never run as root.
 USER node
